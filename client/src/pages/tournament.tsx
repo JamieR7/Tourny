@@ -22,12 +22,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Play, Pause, RotateCcw, ChevronRight, Trophy, Minus, Plus, Info, Sparkles, Medal, Moon, Sun, ArrowUp, ArrowDown, Settings } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Play, Pause, RotateCcw, ChevronRight, Trophy, Minus, Plus, Info, Sparkles, Medal, Moon, Sun, ArrowUp, ArrowDown, Settings, Users } from "lucide-react";
 
 export default function TournamentPage() {
-  // Format State
-  const [tournamentFormat, setTournamentFormat] = useState<TournamentFormat>('groups');
+  // Setup State
   const [isSetupMode, setIsSetupMode] = useState(true);
+  const [tournamentFormat, setTournamentFormat] = useState<TournamentFormat>('groups');
+  const [teamCount, setTeamCount] = useState<number>(8);
+  const [teamNames, setTeamNames] = useState<Record<number, string>>({});
 
   const [teams, setTeams] = useState<Team[]>(INITIAL_TEAMS);
   const [games, setGames] = useState<Game[]>(INITIAL_GAMES);
@@ -73,6 +76,27 @@ export default function TournamentPage() {
       document.body.classList.remove('dark');
     }
   }, [theme]);
+
+  // Initialize Team Names on Setup
+  useEffect(() => {
+      if (isSetupMode) {
+          const newNames: Record<number, string> = {};
+          for (let i = 1; i <= teamCount; i++) {
+              newNames[i] = teamNames[i] || `Team ${i}`;
+          }
+          setTeamNames(newNames);
+          
+          // Auto-select format based on team count
+          if (teamCount === 4 || teamCount === 6) {
+              setTournamentFormat('round-robin');
+          } else if (teamCount === 8) {
+              // Preserve existing selection if possible, otherwise default to groups
+              if (tournamentFormat !== 'groups' && tournamentFormat !== 'round-robin') {
+                setTournamentFormat('groups');
+              }
+          }
+      }
+  }, [teamCount, isSetupMode]);
 
   // --- Timer Logic ---
   useEffect(() => {
@@ -245,6 +269,15 @@ export default function TournamentPage() {
   const handleNextRoundClick = () => {
     setShowNextRoundModal(true);
   };
+  
+  // Calculate max rounds based on format and team count
+  const getMaxRounds = () => {
+      if (tournamentFormat === 'groups') return 9;
+      if (teamCount === 4) return 3;
+      if (teamCount === 6) return 8; // approx 7.5 -> 8 rounds
+      if (teamCount === 8) return 14;
+      return 14;
+  };
 
   // Actual logic to advance round
   const executeNextRound = (isAutoAdvance = false) => {
@@ -294,10 +327,10 @@ export default function TournamentPage() {
     setGames(finalGames);
     
     // Determine max rounds
-    const maxRounds = tournamentFormat === 'groups' ? 9 : 14;
+    const maxRounds = getMaxRounds();
 
     if (r >= maxRounds) {
-        setCurrentRound(maxRounds + 1); // 10 for groups, 15 for RR
+        setCurrentRound(maxRounds + 1); 
         setShowCelebration(true);
         resetTimer();
     } else {
@@ -318,14 +351,34 @@ export default function TournamentPage() {
   };
 
   const handleStartTournament = () => {
-      setIsSetupMode(false);
+      // Create Team Objects
+      const newTeams: Team[] = [];
+      const half = Math.ceil(teamCount / 2);
+      
+      for (let i = 1; i <= teamCount; i++) {
+          newTeams.push({
+              id: i,
+              name: teamNames[i] || `Team ${i}`,
+              group: i <= half ? 'A' : 'B' // Simple split for groups if needed
+          });
+      }
+      setTeams(newTeams);
+
+      // Generate Schedule
       if (tournamentFormat === 'groups') {
+          // Groups format is currently hardcoded for 8 teams (4v4)
+          // If the user selected 'groups' but has 4 or 6 teams, we should fallback or handle it.
+          // The requirements say "Show the Tournament Format selector only when it makes sense" (8 teams)
+          // So if we are here, teamCount SHOULD be 8.
+          // Just to be safe, use INITIAL_GAMES but re-map IDs if needed (though INITIAL_GAMES is hardcoded for 8)
           setGames(INITIAL_GAMES);
       } else {
-          setGames(generateRoundRobinSchedule());
+          setGames(generateRoundRobinSchedule(teamCount));
       }
+      
       setCurrentRound(1);
       resetTimer();
+      setIsSetupMode(false);
   };
 
   // Ref for games to avoid stale closures in timer
@@ -351,6 +404,7 @@ export default function TournamentPage() {
           setShowCelebration(false);
           setFinalResultsRevealed(false);
           resetTimer();
+          setTeamCount(8); // Reset to default
           setTournamentFormat('groups'); // Reset to default
       }
   };
@@ -376,7 +430,7 @@ export default function TournamentPage() {
     (tournamentFormat === 'groups' ? calculateFinalPlacings(games, teams) : []) // RR Logic handled by League Table mostly
     : [];
 
-  const maxRounds = tournamentFormat === 'groups' ? 9 : 14;
+  const maxRounds = getMaxRounds();
 
   return (
     <div className={`min-h-screen font-sans p-4 md:p-8 max-w-7xl mx-auto relative transition-colors duration-300 ${theme === 'dark' ? 'bg-slate-900 text-slate-100' : 'bg-white text-slate-900'}`}>
@@ -454,33 +508,86 @@ export default function TournamentPage() {
         
         {/* Setup Mode / Format Selector */}
         {isSetupMode ? (
-             <div className={`flex flex-col items-center p-8 rounded-2xl border-2 shadow-lg w-full max-w-2xl animate-in zoom-in-95 duration-300 ${theme === 'dark' ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+             <div className={`flex flex-col items-center p-8 rounded-2xl border-2 shadow-lg w-full max-w-3xl animate-in zoom-in-95 duration-300 ${theme === 'dark' ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
                  <div className="flex items-center gap-2 mb-6">
                      <Settings className="h-6 w-6 text-amber-500" />
                      <h2 className={`text-2xl font-bold uppercase tracking-wide ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Tournament Setup</h2>
                  </div>
                  
-                 <div className="w-full max-w-md space-y-6">
-                     <div className="space-y-3">
-                         <Label className={`text-lg font-semibold ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>Select Format</Label>
-                         <RadioGroup value={tournamentFormat} onValueChange={(v) => setTournamentFormat(v as TournamentFormat)} className="flex flex-col gap-3">
-                             <div className={`flex items-center space-x-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${tournamentFormat === 'groups' ? 'border-amber-500 bg-amber-500/10' : (theme === 'dark' ? 'border-slate-700 hover:bg-slate-700' : 'border-slate-200 hover:bg-slate-50')}`}>
-                                 <RadioGroupItem value="groups" id="groups" className="text-amber-500 border-2 border-current" />
-                                 <Label htmlFor="groups" className="cursor-pointer flex-1">
-                                     <div className={`font-bold text-lg ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Group Stage</div>
-                                     <div className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>2 Groups of 4 + Finals (9 Rounds)</div>
-                                 </Label>
+                 <div className="w-full grid md:grid-cols-2 gap-8">
+                     <div className="space-y-6">
+                         {/* Team Count Selector */}
+                         <div className="space-y-3">
+                             <Label className={`text-lg font-semibold flex items-center gap-2 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                                 <Users className="h-5 w-5" /> Number of Teams
+                             </Label>
+                             <div className="flex gap-2">
+                                 {[4, 6, 8].map(count => (
+                                     <Button
+                                         key={count}
+                                         variant={teamCount === count ? 'default' : 'outline'}
+                                         onClick={() => setTeamCount(count)}
+                                         className={`flex-1 h-12 text-lg font-bold ${teamCount === count ? 'bg-amber-500 hover:bg-amber-600 text-slate-900' : (theme === 'dark' ? 'border-slate-600 text-slate-300' : 'border-slate-200 text-slate-700')}`}
+                                     >
+                                         {count} Teams
+                                     </Button>
+                                 ))}
                              </div>
-                             <div className={`flex items-center space-x-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${tournamentFormat === 'round-robin' ? 'border-amber-500 bg-amber-500/10' : (theme === 'dark' ? 'border-slate-700 hover:bg-slate-700' : 'border-slate-200 hover:bg-slate-50')}`}>
-                                 <RadioGroupItem value="round-robin" id="round-robin" className="text-amber-500 border-2 border-current" />
-                                 <Label htmlFor="round-robin" className="cursor-pointer flex-1">
-                                     <div className={`font-bold text-lg ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Full Round Robin</div>
-                                     <div className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>All teams play each other (14 Rounds)</div>
-                                 </Label>
+                         </div>
+
+                         {/* Format Selector - Only for 8 Teams */}
+                         {teamCount === 8 && (
+                             <div className="space-y-3 animate-in fade-in duration-300">
+                                 <Label className={`text-lg font-semibold ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>Select Format</Label>
+                                 <RadioGroup value={tournamentFormat} onValueChange={(v) => setTournamentFormat(v as TournamentFormat)} className="flex flex-col gap-3">
+                                     <div className={`flex items-center space-x-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${tournamentFormat === 'groups' ? 'border-amber-500 bg-amber-500/10' : (theme === 'dark' ? 'border-slate-700 hover:bg-slate-700' : 'border-slate-200 hover:bg-slate-50')}`}>
+                                         <RadioGroupItem value="groups" id="groups" className="text-amber-500 border-2 border-current" />
+                                         <Label htmlFor="groups" className="cursor-pointer flex-1">
+                                             <div className={`font-bold text-lg ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Group Stage</div>
+                                             <div className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>2 Groups of 4 + Finals</div>
+                                         </Label>
+                                     </div>
+                                     <div className={`flex items-center space-x-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${tournamentFormat === 'round-robin' ? 'border-amber-500 bg-amber-500/10' : (theme === 'dark' ? 'border-slate-700 hover:bg-slate-700' : 'border-slate-200 hover:bg-slate-50')}`}>
+                                         <RadioGroupItem value="round-robin" id="round-robin" className="text-amber-500 border-2 border-current" />
+                                         <Label htmlFor="round-robin" className="cursor-pointer flex-1">
+                                             <div className={`font-bold text-lg ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Full Round Robin</div>
+                                             <div className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>All teams play each other</div>
+                                         </Label>
+                                     </div>
+                                 </RadioGroup>
                              </div>
-                         </RadioGroup>
+                         )}
+
+                         {/* Info for Fixed Formats */}
+                         {teamCount !== 8 && (
+                             <div className={`p-4 rounded-xl border-2 border-dashed ${theme === 'dark' ? 'border-slate-700 bg-slate-800/50' : 'border-slate-200 bg-slate-50'}`}>
+                                 <div className={`font-bold mb-1 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>Format: Full Round Robin</div>
+                                 <div className={`text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                                     {teamCount === 4 ? '3 Rounds (6 Games Total)' : '8 Rounds (15 Games Total)'}
+                                 </div>
+                             </div>
+                         )}
                      </div>
 
+                     <div className="space-y-4">
+                         <Label className={`text-lg font-semibold ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>Team Names</Label>
+                         <div className="grid grid-cols-1 gap-2 max-h-[300px] overflow-y-auto pr-2">
+                             {Array.from({ length: teamCount }, (_, i) => i + 1).map(id => (
+                                 <div key={id} className="flex items-center gap-2">
+                                     <span className={`text-sm font-mono font-bold w-8 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>{id}.</span>
+                                     <Input 
+                                         value={teamNames[id] || ''} 
+                                         onChange={(e) => setTeamNames(prev => ({ ...prev, [id]: e.target.value }))}
+                                         className={`h-10 ${theme === 'dark' ? 'bg-slate-900 border-slate-700' : 'bg-white'}`}
+                                         placeholder={`Team ${id}`}
+                                     />
+                                 </div>
+                             ))}
+                         </div>
+                     </div>
+                 </div>
+                 
+                 <div className="w-full mt-8">
                      <Button size="lg" className="w-full h-14 text-xl font-bold uppercase tracking-widest bg-green-600 hover:bg-green-700 text-white shadow-lg" onClick={handleStartTournament}>
                          Start Tournament
                      </Button>
