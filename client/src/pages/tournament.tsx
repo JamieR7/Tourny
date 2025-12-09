@@ -59,6 +59,10 @@ export default function TournamentPage() {
   const [showCelebration, setShowCelebration] = useState(false);
   const [showNextRoundModal, setShowNextRoundModal] = useState(false);
   const [showResetModal, setShowResetModal] = useState(false);
+  const [showShortGameWarning, setShowShortGameWarning] = useState(false);
+  const [pendingGameDuration, setPendingGameDuration] = useState(0);
+  const [pendingStartTime, setPendingStartTime] = useState(0);
+
   const [finalResultsRevealed, setFinalResultsRevealed] = useState(false);
   const resultsRef = useRef<HTMLDivElement>(null);
 
@@ -371,6 +375,38 @@ export default function TournamentPage() {
     
     setShowNextRoundModal(false);
   };
+  
+  // Reusable start function
+  const startTournament = (duration: number, startTime: number) => {
+      setStartTimeTimestamp(startTime);
+      setGameDurationSeconds(duration);
+      setTimeLeft(duration);
+
+      // Create Team Objects
+      const newTeams: Team[] = [];
+      const half = Math.ceil(teamCount / 2);
+      
+      for (let i = 1; i <= teamCount; i++) {
+          newTeams.push({
+              id: i,
+              name: teamNames[i] || `Team ${i}`,
+              group: i <= half ? 'A' : 'B' // Simple split for groups if needed
+          });
+      }
+      setTeams(newTeams);
+
+      // Generate Schedule
+      if (tournamentFormat === 'groups') {
+          setGames(INITIAL_GAMES);
+      } else {
+          setGames(generateRoundRobinSchedule(teamCount));
+      }
+      
+      setCurrentRound(1);
+      setTotalPausedTime(0);
+      setTimerActive(false);
+      setIsSetupMode(false);
+  }
 
   const handleStartTournament = () => {
       // 1. Calculate Time & Duration
@@ -380,8 +416,6 @@ export default function TournamentPage() {
       if (startMode === 'custom') {
           const [startH, startM] = customStartTime.split(':').map(Number);
           start.setHours(startH, startM, 0, 0);
-          // If start time is in the past (e.g. 9am and it's 2pm), assume tomorrow? Or just keep today?
-          // Usually for same-day setup.
           if (start < now) {
              // Optional: warn or assume today. Let's keep today.
           }
@@ -405,40 +439,18 @@ export default function TournamentPage() {
       const durationPerRound = Math.floor(totalSecondsAvailable / rounds);
 
       if (durationPerRound < 120) {
-          if (!confirm(`Warning: Game duration will be very short (${durationPerRound} seconds). Continue?`)) {
-              return;
-          }
-      }
-
-      setStartTimeTimestamp(start.getTime());
-      setGameDurationSeconds(durationPerRound);
-      setTimeLeft(durationPerRound);
-
-
-      // 2. Create Team Objects
-      const newTeams: Team[] = [];
-      const half = Math.ceil(teamCount / 2);
-      
-      for (let i = 1; i <= teamCount; i++) {
-          newTeams.push({
-              id: i,
-              name: teamNames[i] || `Team ${i}`,
-              group: i <= half ? 'A' : 'B' // Simple split for groups if needed
-          });
-      }
-      setTeams(newTeams);
-
-      // 3. Generate Schedule
-      if (tournamentFormat === 'groups') {
-          setGames(INITIAL_GAMES);
-      } else {
-          setGames(generateRoundRobinSchedule(teamCount));
+          setPendingGameDuration(durationPerRound);
+          setPendingStartTime(start.getTime());
+          setShowShortGameWarning(true);
+          return;
       }
       
-      setCurrentRound(1);
-      setTotalPausedTime(0);
-      setTimerActive(false);
-      setIsSetupMode(false);
+      startTournament(durationPerRound, start.getTime());
+  };
+
+  const confirmStartTournament = () => {
+      startTournament(pendingGameDuration, pendingStartTime);
+      setShowShortGameWarning(false);
   };
 
   // Ref for games to avoid stale closures in timer
@@ -605,6 +617,38 @@ export default function TournamentPage() {
                           className="bg-red-600 hover:bg-red-700 text-white font-bold"
                       >
                           Reset
+                      </Button>
+                  </div>
+              </div>
+          </div>
+      )}
+
+      {/* Short Game Warning Modal */}
+      {showShortGameWarning && (
+          <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
+              <div className={`p-8 rounded-2xl shadow-2xl max-w-md w-full mx-4 border-2 ${theme === 'dark' ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-200'}`}>
+                  <div className="flex items-center gap-3 mb-4 text-amber-500">
+                      <AlertTriangle className="h-8 w-8" />
+                      <h3 className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Very short games</h3>
+                  </div>
+                  <p className={`mb-8 text-lg ${theme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`}>
+                      Each game would be only {Math.floor(pendingGameDuration / 60)} minutes {pendingGameDuration % 60} seconds. Consider choosing a later finish time.
+                  </p>
+                  <div className="flex flex-col sm:flex-row gap-4 justify-end">
+                      <Button 
+                          variant="outline" 
+                          size="lg"
+                          onClick={() => setShowShortGameWarning(false)}
+                          className={`font-bold ${theme === 'dark' ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-slate-300 text-slate-700 hover:bg-slate-100'}`}
+                      >
+                          Change finish time
+                      </Button>
+                      <Button 
+                          size="lg"
+                          onClick={confirmStartTournament}
+                          className="bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold"
+                      >
+                          Start anyway
                       </Button>
                   </div>
               </div>
