@@ -170,8 +170,26 @@ export default function TournamentPage() {
     setGames(prev => prev.map(g => {
       if (g.id !== gameId) return g;
       const newScore = team === 'A' ? Math.max(0, g.scoreA + delta) : Math.max(0, g.scoreB + delta);
+      // Status update is handled by the "Next Round" button, OR by direct edit below.
+      // For button clicks (+/-), we just update score. 
       return { ...g, [team === 'A' ? 'scoreA' : 'scoreB']: newScore };
     }));
+  };
+
+  // Direct score edit function for the table inputs
+  const handleScoreEdit = (gameId: number, team: 'A' | 'B', value: string) => {
+      const numValue = parseInt(value);
+      if (isNaN(numValue)) return; // Ignore invalid input
+
+      setGames(prev => prev.map(g => {
+          if (g.id !== gameId) return g;
+          // Mark as finished if editing a game, as per requirements
+          return { 
+              ...g, 
+              [team === 'A' ? 'scoreA' : 'scoreB']: Math.max(0, numValue),
+              status: 'finished'
+          };
+      }));
   };
 
   const handleNextRound = () => {
@@ -183,6 +201,18 @@ export default function TournamentPage() {
     // 2. Logic for finals generation after Round 6
     let finalGames = [...updatedGames];
     
+    // We need to re-calculate everything because scores might have changed in previous steps
+    // But generating fixtures only happens ONCE when moving from R6 to R7.
+    // Wait, if we edit R1-R6 scores AFTER finals are generated, finals participants might change!
+    // For now, let's stick to the requested flow: "Immediately recompute Group standings".
+    // If we want to fully support "retroactive changes affect finals", we'd need to re-run generateFinalsFixtures every render
+    // or useEffect. But that might overwrite existing finals scores.
+    // The prompt says: "Allow correcting scores... Immediately recompute Group standings (for group-stage games). Final standings (for finals/placement games)."
+    // It doesn't explicitly say "Re-seed the finals if group standings change". 
+    // Usually in tournaments, once finals start, group results are locked. 
+    // I will assume re-seeding is NOT required unless the user resets. 
+    // But for "Final standings" (the 1-8 table), recomputing based on finals scores IS required.
+
     if (currentRound === 6) {
       const standingsA = calculateStandings(updatedGames, teams.filter(t => t.group === 'A'));
       const standingsB = calculateStandings(updatedGames, teams.filter(t => t.group === 'B'));
@@ -458,7 +488,7 @@ export default function TournamentPage() {
                            <TableHead className="w-16">Rnd</TableHead>
                            <TableHead className="w-40">Match</TableHead>
                            <TableHead className="text-right">Team A</TableHead>
-                           <TableHead className="text-center w-24">Score</TableHead>
+                           <TableHead className="text-center w-32">Score</TableHead>
                            <TableHead>Team B</TableHead>
                        </TableRow>
                    </TableHeader>
@@ -474,8 +504,20 @@ export default function TournamentPage() {
                                    {game.group ? `Group ${game.group}` : game.description}
                                </TableCell>
                                <TableCell className="text-right font-medium">{getTeamName(game.teamAId)}</TableCell>
-                               <TableCell className="text-center font-mono font-bold bg-slate-100 rounded">
-                                   {game.scoreA} - {game.scoreB}
+                               <TableCell className="text-center">
+                                   <div className="flex items-center justify-center gap-1">
+                                       <Input 
+                                           className="w-10 h-8 p-1 text-center font-mono font-bold" 
+                                           value={game.scoreA} 
+                                           onChange={(e) => handleScoreEdit(game.id, 'A', e.target.value)}
+                                       />
+                                       <span className="text-slate-300">-</span>
+                                       <Input 
+                                           className="w-10 h-8 p-1 text-center font-mono font-bold" 
+                                           value={game.scoreB} 
+                                           onChange={(e) => handleScoreEdit(game.id, 'B', e.target.value)}
+                                       />
+                                   </div>
                                </TableCell>
                                <TableCell className="font-medium">{getTeamName(game.teamBId)}</TableCell>
                            </TableRow>
@@ -495,8 +537,20 @@ export default function TournamentPage() {
                                    <div>{getTeamName(game.teamAId)}</div>
                                    {game.sourceA && <div className="text-[10px] text-slate-400">{game.sourceA}</div>}
                                </TableCell>
-                               <TableCell className="text-center font-mono font-bold bg-slate-100 rounded">
-                                   {game.scoreA} - {game.scoreB}
+                               <TableCell className="text-center">
+                                   <div className="flex items-center justify-center gap-1">
+                                       <Input 
+                                           className="w-10 h-8 p-1 text-center font-mono font-bold" 
+                                           value={game.scoreA} 
+                                           onChange={(e) => handleScoreEdit(game.id, 'A', e.target.value)}
+                                       />
+                                       <span className="text-slate-300">-</span>
+                                       <Input 
+                                           className="w-10 h-8 p-1 text-center font-mono font-bold" 
+                                           value={game.scoreB} 
+                                           onChange={(e) => handleScoreEdit(game.id, 'B', e.target.value)}
+                                       />
+                                   </div>
                                </TableCell>
                                <TableCell className="font-medium">
                                    <div>{getTeamName(game.teamBId)}</div>
@@ -522,10 +576,7 @@ export default function TournamentPage() {
                 <FinalStandingsTable placings={finalPlacings} />
             )}
             
-            {/* Finals Rules Box (Only show during tournament, or maybe keep it always?) 
-                User said "Remove or hide any previous Group blocks so there is just this single list."
-                I'll hide the rules box too when finished to keep it clean.
-            */}
+            {/* Finals Rules Box */}
             {currentRound < 10 && (
                 <div className="bg-slate-50 border border-slate-200 rounded-xl p-6">
                     <div className="flex items-center gap-2 mb-4 text-slate-700 font-bold uppercase text-sm tracking-wider">
@@ -622,7 +673,8 @@ function FinalStandingsTable({ placings }: { placings: FinalPlacing[] }) {
                    <TableRow className="bg-amber-50 hover:bg-amber-50">
                        <TableHead className="w-16 font-bold text-slate-900">Pos</TableHead>
                        <TableHead className="font-bold text-slate-900">Team</TableHead>
-                       <TableHead className="font-bold text-slate-900">Group</TableHead>
+                       <TableHead className="font-bold text-slate-900">Group Pos</TableHead>
+                       <TableHead className="font-bold text-slate-900">Group Stats</TableHead>
                        <TableHead className="font-bold text-slate-900">Path</TableHead>
                    </TableRow>
                </TableHeader>
@@ -631,7 +683,12 @@ function FinalStandingsTable({ placings }: { placings: FinalPlacing[] }) {
                        <TableRow key={row.teamId} className="hover:bg-amber-50/50">
                            <TableCell className="font-display font-bold text-2xl text-slate-900">{row.position}</TableCell>
                            <TableCell className="font-bold text-lg">{row.teamName}</TableCell>
-                           <TableCell className="text-slate-500 font-medium">Group {row.group}</TableCell>
+                           <TableCell className="text-slate-700 font-semibold">
+                                {row.groupRank}{row.groupRank === 1 ? 'st' : row.groupRank === 2 ? 'nd' : row.groupRank === 3 ? 'rd' : 'th'} in Group {row.group}
+                           </TableCell>
+                           <TableCell className="text-slate-600 font-mono text-sm">
+                                {row.groupPoints} pts, {row.groupGD > 0 ? '+' : ''}{row.groupGD} GD
+                           </TableCell>
                            <TableCell className="text-slate-600 italic">{row.path}</TableCell>
                        </TableRow>
                    ))}

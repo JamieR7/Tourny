@@ -57,6 +57,9 @@ export type FinalPlacing = {
   teamName: string;
   group: 'A' | 'B';
   path: string;
+  groupRank: number;
+  groupPoints: number;
+  groupGD: number;
 };
 
 // Initial Data
@@ -126,6 +129,12 @@ export function calculateStandings(games: Game[], teams: Team[]): Standing[] {
 
   // Process games
   games.forEach(game => {
+    // Only count group games that have scores (even if not strictly "finished" if we allow editing)
+    // Actually, traditionally we only count finished games. 
+    // BUT the requirement says "Scores can be corrected... Immediately recompute Group standings".
+    // So we should count any game that has scores or is marked finished? 
+    // Spec says "Mark the game as status: 'finished' (or keep it finished)." when editing.
+    // So checking status === 'finished' is still correct, as editing will ensure it's finished.
     if (game.status === 'finished' && game.stage === 'group' && game.teamAId && game.teamBId) {
       const teamA = standings[game.teamAId];
       const teamB = standings[game.teamBId];
@@ -279,14 +288,25 @@ export function calculateFinalPlacings(games: Game[], teams: Team[]): FinalPlaci
   const placings: FinalPlacing[] = [];
   const teamMap = new Map(teams.map(t => [t.id, t]));
 
+  // Calculate Group Stats first for enrichment
+  const standingsA = calculateStandings(games, teams.filter(t => t.group === 'A'));
+  const standingsB = calculateStandings(games, teams.filter(t => t.group === 'B'));
+  
+  const groupStats = new Map<number, { rank: number, points: number, gd: number }>();
+  
+  standingsA.forEach((s, idx) => {
+    groupStats.set(s.teamId, { rank: idx + 1, points: s.points, gd: s.gd });
+  });
+  standingsB.forEach((s, idx) => {
+    groupStats.set(s.teamId, { rank: idx + 1, points: s.points, gd: s.gd });
+  });
+
+  const getStats = (teamId: number) => groupStats.get(teamId) || { rank: 0, points: 0, gd: 0 };
+
   // Helper to get winner/loser ID
   const getResult = (game: Game) => {
     if (game.scoreA > game.scoreB) return { winner: game.teamAId, loser: game.teamBId };
     if (game.scoreB > game.scoreA) return { winner: game.teamBId, loser: game.teamAId };
-    // Tie-breaker? Spec implies fixed format so ties should ideally not happen in finals, 
-    // but if they do, we'll just pick Team A as winner for safety unless we want complex tie-break UI.
-    // For now, assume sudden death or penalty shootout happened and score reflects it, 
-    // or just default to Team A for robustness.
     return { winner: game.teamAId, loser: game.teamBId };
   };
 
@@ -295,46 +315,61 @@ export function calculateFinalPlacings(games: Game[], teams: Team[]): FinalPlaci
   if (grandFinal && grandFinal.teamAId && grandFinal.teamBId) {
     const { winner, loser } = getResult(grandFinal);
     if (winner && teamMap.has(winner)) {
+      const stats = getStats(winner);
       placings.push({
         position: 1,
         teamId: winner,
         teamName: teamMap.get(winner)!.name,
         group: teamMap.get(winner)!.group,
-        path: 'Winner Grand Final'
+        path: 'Winner Grand Final',
+        groupRank: stats.rank,
+        groupPoints: stats.points,
+        groupGD: stats.gd
       });
     }
     if (loser && teamMap.has(loser)) {
+      const stats = getStats(loser);
       placings.push({
         position: 2,
         teamId: loser,
         teamName: teamMap.get(loser)!.name,
         group: teamMap.get(loser)!.group,
-        path: 'Runner-up Grand Final'
+        path: 'Runner-up Grand Final',
+        groupRank: stats.rank,
+        groupPoints: stats.points,
+        groupGD: stats.gd
       });
     }
   }
 
   // 3rd & 4th: 3rd Place Playoff (Round 9, Stage 'placing', Court 2 usually or by description)
-  // We can look for the game description "3rd/4th Playoff" or by elimination of the final
   const thirdPlaceGame = games.find(g => g.description.includes('3rd/4th'));
   if (thirdPlaceGame && thirdPlaceGame.teamAId && thirdPlaceGame.teamBId) {
     const { winner, loser } = getResult(thirdPlaceGame);
     if (winner && teamMap.has(winner)) {
+      const stats = getStats(winner);
       placings.push({
         position: 3,
         teamId: winner,
         teamName: teamMap.get(winner)!.name,
         group: teamMap.get(winner)!.group,
-        path: 'Winner 3rd Place Playoff'
+        path: 'Winner 3rd Place Playoff',
+        groupRank: stats.rank,
+        groupPoints: stats.points,
+        groupGD: stats.gd
       });
     }
     if (loser && teamMap.has(loser)) {
+      const stats = getStats(loser);
       placings.push({
         position: 4,
         teamId: loser,
         teamName: teamMap.get(loser)!.name,
         group: teamMap.get(loser)!.group,
-        path: 'Loser 3rd Place Playoff'
+        path: 'Loser 3rd Place Playoff',
+        groupRank: stats.rank,
+        groupPoints: stats.points,
+        groupGD: stats.gd
       });
     }
   }
@@ -344,21 +379,29 @@ export function calculateFinalPlacings(games: Game[], teams: Team[]): FinalPlaci
   if (fifthPlaceGame && fifthPlaceGame.teamAId && fifthPlaceGame.teamBId) {
     const { winner, loser } = getResult(fifthPlaceGame);
     if (winner && teamMap.has(winner)) {
+      const stats = getStats(winner);
       placings.push({
         position: 5,
         teamId: winner,
         teamName: teamMap.get(winner)!.name,
         group: teamMap.get(winner)!.group,
-        path: 'Winner 5th/6th Playoff'
+        path: 'Winner 5th/6th Playoff',
+        groupRank: stats.rank,
+        groupPoints: stats.points,
+        groupGD: stats.gd
       });
     }
     if (loser && teamMap.has(loser)) {
+      const stats = getStats(loser);
       placings.push({
         position: 6,
         teamId: loser,
         teamName: teamMap.get(loser)!.name,
         group: teamMap.get(loser)!.group,
-        path: 'Loser 5th/6th Playoff'
+        path: 'Loser 5th/6th Playoff',
+        groupRank: stats.rank,
+        groupPoints: stats.points,
+        groupGD: stats.gd
       });
     }
   }
@@ -368,21 +411,29 @@ export function calculateFinalPlacings(games: Game[], teams: Team[]): FinalPlaci
   if (seventhPlaceGame && seventhPlaceGame.teamAId && seventhPlaceGame.teamBId) {
     const { winner, loser } = getResult(seventhPlaceGame);
     if (winner && teamMap.has(winner)) {
+      const stats = getStats(winner);
       placings.push({
         position: 7,
         teamId: winner,
         teamName: teamMap.get(winner)!.name,
         group: teamMap.get(winner)!.group,
-        path: 'Winner 7th/8th Playoff'
+        path: 'Winner 7th/8th Playoff',
+        groupRank: stats.rank,
+        groupPoints: stats.points,
+        groupGD: stats.gd
       });
     }
     if (loser && teamMap.has(loser)) {
+      const stats = getStats(loser);
       placings.push({
         position: 8,
         teamId: loser,
         teamName: teamMap.get(loser)!.name,
         group: teamMap.get(loser)!.group,
-        path: 'Loser 7th/8th Playoff'
+        path: 'Loser 7th/8th Playoff',
+        groupRank: stats.rank,
+        groupPoints: stats.points,
+        groupGD: stats.gd
       });
     }
   }
