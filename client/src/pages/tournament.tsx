@@ -23,7 +23,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Play, Pause, RotateCcw, ChevronRight, Trophy, Minus, Plus, Info, Sparkles, Medal, Moon, Sun, ArrowUp, ArrowDown, Settings, Users } from "lucide-react";
+import { Play, Pause, RotateCcw, ChevronRight, Trophy, Minus, Plus, Info, Sparkles, Medal, Moon, Sun, ArrowUp, ArrowDown, Settings, Users, Clock, AlertTriangle } from "lucide-react";
+import { format, addSeconds } from "date-fns";
 
 export default function TournamentPage() {
   // Setup State
@@ -32,21 +33,32 @@ export default function TournamentPage() {
   const [teamCount, setTeamCount] = useState<number>(8);
   const [teamNames, setTeamNames] = useState<Record<number, string>>({});
 
+  // Time Setup
+  const [startMode, setStartMode] = useState<'now' | 'custom'>('now');
+  const [customStartTime, setCustomStartTime] = useState("09:00");
+  const [finishTime, setFinishTime] = useState("11:00");
+
   const [teams, setTeams] = useState<Team[]>(INITIAL_TEAMS);
   const [games, setGames] = useState<Game[]>(INITIAL_GAMES);
   const [currentRound, setCurrentRound] = useState(1);
-  const [timerMinutes, setTimerMinutes] = useState(10);
-  const [timeLeft, setTimeLeft] = useState(10 * 60);
+  const [gameDurationSeconds, setGameDurationSeconds] = useState(600); // Default 10 mins
+  const [timeLeft, setTimeLeft] = useState(600);
   const [timerActive, setTimerActive] = useState(false);
   const [timerFinished, setTimerFinished] = useState(false);
   const [autoAdvance, setAutoAdvance] = useState(true);
   
+  // Timer & Finish Time Logic
+  const [startTimeTimestamp, setStartTimeTimestamp] = useState<number | null>(null);
+  const [totalPausedTime, setTotalPausedTime] = useState(0);
+  const pauseStartRef = useRef<number | null>(null);
+
   // Theme State
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
 
   // Modal States
   const [showCelebration, setShowCelebration] = useState(false);
   const [showNextRoundModal, setShowNextRoundModal] = useState(false);
+  const [showResetModal, setShowResetModal] = useState(false);
   const [finalResultsRevealed, setFinalResultsRevealed] = useState(false);
   const resultsRef = useRef<HTMLDivElement>(null);
 
@@ -101,9 +113,9 @@ export default function TournamentPage() {
   // --- Timer Logic ---
   useEffect(() => {
     if (!timerActive) {
-        setTimeLeft(timerMinutes * 60);
+        setTimeLeft(gameDurationSeconds);
     }
-  }, [timerMinutes]);
+  }, [gameDurationSeconds]);
 
   useEffect(() => {
     if (timerActive) {
@@ -214,8 +226,16 @@ export default function TournamentPage() {
       if (!timerActive) {
           initAudio();
           endTimeRef.current = Date.now() + timeLeft * 1000;
+          
+          // Resume Logic
+          if (pauseStartRef.current) {
+              const pausedDuration = Date.now() - pauseStartRef.current;
+              setTotalPausedTime(prev => prev + pausedDuration);
+              pauseStartRef.current = null;
+          }
       } else {
           endTimeRef.current = null;
+          pauseStartRef.current = Date.now();
       }
       setTimerActive(!timerActive);
   };
@@ -223,8 +243,10 @@ export default function TournamentPage() {
   const resetTimer = () => {
     setTimerActive(false);
     setTimerFinished(false);
-    setTimeLeft(timerMinutes * 60);
+    setTimeLeft(gameDurationSeconds);
     endTimeRef.current = null;
+    pauseStartRef.current = null; 
+    // Do NOT reset totalPausedTime here - pause accumulates over tournament
   };
 
   const formatTime = (seconds: number) => {
@@ -341,7 +363,7 @@ export default function TournamentPage() {
             // Wait for state to settle then restart timer
             setTimeout(() => {
                 initAudio();
-                endTimeRef.current = Date.now() + (timerMinutes * 60 * 1000);
+                endTimeRef.current = Date.now() + (gameDurationSeconds * 1000);
                 setTimerActive(true);
             }, 500);
         }
@@ -351,7 +373,49 @@ export default function TournamentPage() {
   };
 
   const handleStartTournament = () => {
-      // Create Team Objects
+      // 1. Calculate Time & Duration
+      const now = new Date();
+      let start = new Date();
+      
+      if (startMode === 'custom') {
+          const [startH, startM] = customStartTime.split(':').map(Number);
+          start.setHours(startH, startM, 0, 0);
+          // If start time is in the past (e.g. 9am and it's 2pm), assume tomorrow? Or just keep today?
+          // Usually for same-day setup.
+          if (start < now) {
+             // Optional: warn or assume today. Let's keep today.
+          }
+      } else {
+          // Start now
+          start = now;
+      }
+
+      const [finishH, finishM] = finishTime.split(':').map(Number);
+      const finish = new Date();
+      finish.setHours(finishH, finishM, 0, 0);
+
+      // Validation
+      if (finish <= start) {
+          alert("Finish time must be after start time!");
+          return;
+      }
+
+      const totalSecondsAvailable = (finish.getTime() - start.getTime()) / 1000;
+      const rounds = getMaxRounds();
+      const durationPerRound = Math.floor(totalSecondsAvailable / rounds);
+
+      if (durationPerRound < 120) {
+          if (!confirm(`Warning: Game duration will be very short (${durationPerRound} seconds). Continue?`)) {
+              return;
+          }
+      }
+
+      setStartTimeTimestamp(start.getTime());
+      setGameDurationSeconds(durationPerRound);
+      setTimeLeft(durationPerRound);
+
+
+      // 2. Create Team Objects
       const newTeams: Team[] = [];
       const half = Math.ceil(teamCount / 2);
       
@@ -364,20 +428,16 @@ export default function TournamentPage() {
       }
       setTeams(newTeams);
 
-      // Generate Schedule
+      // 3. Generate Schedule
       if (tournamentFormat === 'groups') {
-          // Groups format is currently hardcoded for 8 teams (4v4)
-          // If the user selected 'groups' but has 4 or 6 teams, we should fallback or handle it.
-          // The requirements say "Show the Tournament Format selector only when it makes sense" (8 teams)
-          // So if we are here, teamCount SHOULD be 8.
-          // Just to be safe, use INITIAL_GAMES but re-map IDs if needed (though INITIAL_GAMES is hardcoded for 8)
           setGames(INITIAL_GAMES);
       } else {
           setGames(generateRoundRobinSchedule(teamCount));
       }
       
       setCurrentRound(1);
-      resetTimer();
+      setTotalPausedTime(0);
+      setTimerActive(false);
       setIsSetupMode(false);
   };
 
@@ -396,17 +456,23 @@ export default function TournamentPage() {
     }, 100);
   };
 
-  const resetTournament = () => {
-      if (confirm("Are you sure? This will clear all scores and return to setup.")) {
-          setIsSetupMode(true);
-          setGames(INITIAL_GAMES); // Default reset
-          setCurrentRound(1);
-          setShowCelebration(false);
-          setFinalResultsRevealed(false);
-          resetTimer();
-          setTeamCount(8); // Reset to default
-          setTournamentFormat('groups'); // Reset to default
-      }
+  const handleResetClick = () => {
+      setShowResetModal(true);
+  };
+
+  const executeReset = () => {
+      setIsSetupMode(true);
+      setGames(INITIAL_GAMES); // Default reset
+      setCurrentRound(1);
+      setShowCelebration(false);
+      setFinalResultsRevealed(false);
+      setTimerActive(false);
+      setStartTimeTimestamp(null);
+      setTotalPausedTime(0);
+      pauseStartRef.current = null;
+      setTeamCount(8); // Reset to default
+      setTournamentFormat('groups'); // Reset to default
+      setShowResetModal(false);
   };
 
   const getTeamName = (id: number | null) => {
@@ -419,6 +485,30 @@ export default function TournamentPage() {
       const courtQueue = games.filter(g => g.courtId === courtId).sort((a,b) => a.roundNumber - b.roundNumber);
       const nextGame = courtQueue.find(g => g.roundNumber === currentRound + 1);
       return nextGame;
+  };
+
+  // Expected Finish Calculation
+  const calculateExpectedFinish = () => {
+      if (!startTimeTimestamp) return "--:--";
+      const maxRounds = getMaxRounds();
+      const remainingRounds = Math.max(0, maxRounds - currentRound + 1); 
+      // Current round logic: if timer active, use current timeLeft? 
+      // Or simpler: Total Duration = Start + (Rounds * GameDuration) + Paused
+      
+      const projectedFinish = startTimeTimestamp + (maxRounds * gameDurationSeconds * 1000) + totalPausedTime;
+      
+      // If currently paused, add dynamic drift?
+      // Only if we want real-time update while paused. For now, simple static paused addition is fine.
+      // If paused, projectedFinish is technically driftng every second.
+      // Let's stick to stable calculation + totalPausedTime.
+      
+      // If currently paused, we should add (now - pauseStart) to projected finish visually?
+      let currentPauseDrift = 0;
+      if (!timerActive && pauseStartRef.current && !isSetupMode && !showCelebration) {
+         currentPauseDrift = Date.now() - pauseStartRef.current;
+      }
+
+      return format(new Date(projectedFinish + currentPauseDrift), 'HH:mm');
   };
 
   const standingsA = calculateStandings(games, teams.filter(t => t.group === 'A'));
@@ -483,6 +573,38 @@ export default function TournamentPage() {
                           className="bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold"
                       >
                           Advance
+                      </Button>
+                  </div>
+              </div>
+          </div>
+      )}
+
+      {/* Reset Confirmation Modal */}
+      {showResetModal && (
+          <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
+              <div className={`p-8 rounded-2xl shadow-2xl max-w-md w-full mx-4 border-2 ${theme === 'dark' ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-200'}`}>
+                  <div className="flex items-center gap-3 mb-4 text-red-500">
+                      <AlertTriangle className="h-8 w-8" />
+                      <h3 className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Reset Tournament?</h3>
+                  </div>
+                  <p className={`mb-8 text-lg ${theme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`}>
+                      This will clear all scores and return to setup. All progress will be lost.
+                  </p>
+                  <div className="flex gap-4 justify-end">
+                      <Button 
+                          variant="outline" 
+                          size="lg"
+                          onClick={() => setShowResetModal(false)}
+                          className={`font-bold ${theme === 'dark' ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-slate-300 text-slate-700 hover:bg-slate-100'}`}
+                      >
+                          Cancel
+                      </Button>
+                      <Button 
+                          size="lg"
+                          onClick={executeReset}
+                          className="bg-red-600 hover:bg-red-700 text-white font-bold"
+                      >
+                          Reset
                       </Button>
                   </div>
               </div>
@@ -567,6 +689,37 @@ export default function TournamentPage() {
                                  </div>
                              </div>
                          )}
+                         
+                         {/* Time Calculation Setup */}
+                         <div className="space-y-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+                             <Label className={`text-lg font-semibold flex items-center gap-2 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                                 <Clock className="h-5 w-5" /> Timing
+                             </Label>
+                             
+                             <div className="grid grid-cols-2 gap-4">
+                                 <div className="space-y-2">
+                                     <Label className="text-sm font-medium">Start Time</Label>
+                                     <RadioGroup value={startMode} onValueChange={(v) => setStartMode(v as 'now' | 'custom')} className="flex flex-col gap-2">
+                                         <div className="flex items-center space-x-2">
+                                             <RadioGroupItem value="now" id="start-now" />
+                                             <Label htmlFor="start-now">Start Now</Label>
+                                         </div>
+                                         <div className="flex items-center space-x-2">
+                                             <RadioGroupItem value="custom" id="start-custom" />
+                                             <Label htmlFor="start-custom">Custom</Label>
+                                         </div>
+                                     </RadioGroup>
+                                     {startMode === 'custom' && (
+                                         <Input type="time" value={customStartTime} onChange={e => setCustomStartTime(e.target.value)} className={theme === 'dark' ? 'bg-slate-900' : 'bg-white'} />
+                                     )}
+                                 </div>
+                                 <div className="space-y-2">
+                                     <Label className="text-sm font-medium">Desired Finish Time</Label>
+                                     <Input type="time" value={finishTime} onChange={e => setFinishTime(e.target.value)} className={theme === 'dark' ? 'bg-slate-900' : 'bg-white'} required />
+                                     <p className="text-xs text-slate-500">Game time will be auto-calculated.</p>
+                                 </div>
+                             </div>
+                         </div>
                      </div>
 
                      <div className="space-y-4">
@@ -605,16 +758,6 @@ export default function TournamentPage() {
               </div>
               
               <div className="flex flex-wrap gap-3 items-center justify-center w-full mb-2">
-                <div className="flex items-center gap-2">
-                   <span className={`text-sm font-semibold uppercase ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Mins</span>
-                   <Input 
-                     type="number" 
-                     value={timerMinutes} 
-                     onChange={(e) => setTimerMinutes(Number(e.target.value))}
-                     className={`w-16 text-center font-bold text-lg h-10 focus:border-amber-500 ${theme === 'dark' ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'}`}
-                     disabled={timerActive}
-                   />
-                </div>
                 
                 <Button 
                   size="lg" 
@@ -646,8 +789,13 @@ export default function TournamentPage() {
                  </Label>
               </div>
 
-              <div className={`mt-2 font-bold uppercase tracking-widest text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>
-                 Round {currentRound > maxRounds ? maxRounds : currentRound} / {maxRounds} ({tournamentFormat === 'groups' ? 'Groups' : 'League'})
+              <div className="flex w-full justify-between items-end mt-4 px-4">
+                  <div className={`font-bold uppercase tracking-widest text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>
+                     Round {currentRound > maxRounds ? maxRounds : currentRound} / {maxRounds} ({tournamentFormat === 'groups' ? 'Groups' : 'League'})
+                  </div>
+                  <div className={`font-mono text-sm font-bold ${theme === 'dark' ? 'text-amber-500' : 'text-amber-600'}`}>
+                      Expected Finish: {calculateExpectedFinish()}
+                  </div>
               </div>
             </div>
         )}
@@ -989,7 +1137,7 @@ export default function TournamentPage() {
             </div>
 
             <div className="mt-16 text-center">
-                <Button variant="ghost" onClick={resetTournament} className="text-red-500 hover:text-red-700 hover:bg-red-50/10 cursor-pointer">
+                <Button variant="ghost" onClick={handleResetClick} className="text-red-500 hover:text-red-700 hover:bg-red-50/10 cursor-pointer">
                     Reset Tournament
                 </Button>
             </div>
