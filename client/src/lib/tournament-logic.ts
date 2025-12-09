@@ -51,6 +51,14 @@ export type Standing = {
   points: number;
 };
 
+export type FinalPlacing = {
+  position: number;
+  teamId: number;
+  teamName: string;
+  group: 'A' | 'B';
+  path: string;
+};
+
 // Initial Data
 export const INITIAL_TEAMS: Team[] = [
   { id: 1, name: 'Team 1', group: 'A' },
@@ -265,4 +273,119 @@ export function generateFinalsFixtures(standingsA: Standing[], standingsB: Stand
   });
 
   return games;
+}
+
+export function calculateFinalPlacings(games: Game[], teams: Team[]): FinalPlacing[] {
+  const placings: FinalPlacing[] = [];
+  const teamMap = new Map(teams.map(t => [t.id, t]));
+
+  // Helper to get winner/loser ID
+  const getResult = (game: Game) => {
+    if (game.scoreA > game.scoreB) return { winner: game.teamAId, loser: game.teamBId };
+    if (game.scoreB > game.scoreA) return { winner: game.teamBId, loser: game.teamAId };
+    // Tie-breaker? Spec implies fixed format so ties should ideally not happen in finals, 
+    // but if they do, we'll just pick Team A as winner for safety unless we want complex tie-break UI.
+    // For now, assume sudden death or penalty shootout happened and score reflects it, 
+    // or just default to Team A for robustness.
+    return { winner: game.teamAId, loser: game.teamBId };
+  };
+
+  // 1st & 2nd: Grand Final (Round 9, Stage 'final')
+  const grandFinal = games.find(g => g.stage === 'final' && g.roundNumber === 9);
+  if (grandFinal && grandFinal.teamAId && grandFinal.teamBId) {
+    const { winner, loser } = getResult(grandFinal);
+    if (winner && teamMap.has(winner)) {
+      placings.push({
+        position: 1,
+        teamId: winner,
+        teamName: teamMap.get(winner)!.name,
+        group: teamMap.get(winner)!.group,
+        path: 'Winner Grand Final'
+      });
+    }
+    if (loser && teamMap.has(loser)) {
+      placings.push({
+        position: 2,
+        teamId: loser,
+        teamName: teamMap.get(loser)!.name,
+        group: teamMap.get(loser)!.group,
+        path: 'Runner-up Grand Final'
+      });
+    }
+  }
+
+  // 3rd & 4th: 3rd Place Playoff (Round 9, Stage 'placing', Court 2 usually or by description)
+  // We can look for the game description "3rd/4th Playoff" or by elimination of the final
+  const thirdPlaceGame = games.find(g => g.description.includes('3rd/4th'));
+  if (thirdPlaceGame && thirdPlaceGame.teamAId && thirdPlaceGame.teamBId) {
+    const { winner, loser } = getResult(thirdPlaceGame);
+    if (winner && teamMap.has(winner)) {
+      placings.push({
+        position: 3,
+        teamId: winner,
+        teamName: teamMap.get(winner)!.name,
+        group: teamMap.get(winner)!.group,
+        path: 'Winner 3rd Place Playoff'
+      });
+    }
+    if (loser && teamMap.has(loser)) {
+      placings.push({
+        position: 4,
+        teamId: loser,
+        teamName: teamMap.get(loser)!.name,
+        group: teamMap.get(loser)!.group,
+        path: 'Loser 3rd Place Playoff'
+      });
+    }
+  }
+
+  // 5th & 6th: 5th/6th Playoff (Round 8, description includes '5th/6th')
+  const fifthPlaceGame = games.find(g => g.description.includes('5th/6th'));
+  if (fifthPlaceGame && fifthPlaceGame.teamAId && fifthPlaceGame.teamBId) {
+    const { winner, loser } = getResult(fifthPlaceGame);
+    if (winner && teamMap.has(winner)) {
+      placings.push({
+        position: 5,
+        teamId: winner,
+        teamName: teamMap.get(winner)!.name,
+        group: teamMap.get(winner)!.group,
+        path: 'Winner 5th/6th Playoff'
+      });
+    }
+    if (loser && teamMap.has(loser)) {
+      placings.push({
+        position: 6,
+        teamId: loser,
+        teamName: teamMap.get(loser)!.name,
+        group: teamMap.get(loser)!.group,
+        path: 'Loser 5th/6th Playoff'
+      });
+    }
+  }
+
+  // 7th & 8th: 7th/8th Playoff (Round 8, description includes '7th/8th')
+  const seventhPlaceGame = games.find(g => g.description.includes('7th/8th'));
+  if (seventhPlaceGame && seventhPlaceGame.teamAId && seventhPlaceGame.teamBId) {
+    const { winner, loser } = getResult(seventhPlaceGame);
+    if (winner && teamMap.has(winner)) {
+      placings.push({
+        position: 7,
+        teamId: winner,
+        teamName: teamMap.get(winner)!.name,
+        group: teamMap.get(winner)!.group,
+        path: 'Winner 7th/8th Playoff'
+      });
+    }
+    if (loser && teamMap.has(loser)) {
+      placings.push({
+        position: 8,
+        teamId: loser,
+        teamName: teamMap.get(loser)!.name,
+        group: teamMap.get(loser)!.group,
+        path: 'Loser 7th/8th Playoff'
+      });
+    }
+  }
+
+  return placings.sort((a, b) => a.position - b.position);
 }

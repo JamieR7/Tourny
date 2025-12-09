@@ -5,17 +5,19 @@ import {
   INITIAL_GAMES, 
   COURTS, 
   calculateStandings, 
-  generateFinalsFixtures, 
+  generateFinalsFixtures,
+  calculateFinalPlacings,
   type Game, 
   type Team,
-  type Standing
+  type Standing,
+  type FinalPlacing
 } from "@/lib/tournament-logic";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Play, Pause, RotateCcw, ChevronRight, Trophy, Minus, Plus, Info, Sparkles } from "lucide-react";
+import { Play, Pause, RotateCcw, ChevronRight, Trophy, Minus, Plus, Info, Sparkles, Medal } from "lucide-react";
 
 export default function TournamentPage() {
   const [teams, setTeams] = useState<Team[]>(INITIAL_TEAMS);
@@ -217,8 +219,6 @@ export default function TournamentPage() {
     setGames(finalGames);
     
     // Check if tournament is complete (Round 9 finished)
-    // Actually, we increment round AFTER processing. 
-    // If currentRound is 9, next is 10 (completed)
     if (currentRound >= 9) {
         setCurrentRound(10);
         setShowCelebration(true);
@@ -232,7 +232,6 @@ export default function TournamentPage() {
   const handleRevealResults = () => {
     setShowCelebration(false);
     setFinalResultsRevealed(true);
-    // Use timeout to allow DOM to update visibility before scrolling
     setTimeout(() => {
         resultsRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, 100);
@@ -255,6 +254,7 @@ export default function TournamentPage() {
 
   const standingsA = calculateStandings(games, teams.filter(t => t.group === 'A'));
   const standingsB = calculateStandings(games, teams.filter(t => t.group === 'B'));
+  const finalPlacings = currentRound >= 10 ? calculateFinalPlacings(games, teams) : [];
 
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans p-4 md:p-8 max-w-7xl mx-auto relative">
@@ -512,46 +512,53 @@ export default function TournamentPage() {
         {/* Standings */}
         <div className="space-y-8" ref={resultsRef}>
             {/* Logic: If tournament is NOT complete, show current standings. 
-                If complete, show ONLY if revealed. */}
-            {(currentRound < 10 || finalResultsRevealed) && (
+                If complete, show final placings 1-8. */}
+            {currentRound < 10 ? (
                 <>
                     <StandingsTable group="A" data={standingsA} />
                     <StandingsTable group="B" data={standingsB} />
                 </>
+            ) : finalResultsRevealed && (
+                <FinalStandingsTable placings={finalPlacings} />
             )}
             
-            {/* Finals Rules Box */}
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-6">
-                <div className="flex items-center gap-2 mb-4 text-slate-700 font-bold uppercase text-sm tracking-wider">
-                    <Info className="h-4 w-4" /> Finals Format Rules
+            {/* Finals Rules Box (Only show during tournament, or maybe keep it always?) 
+                User said "Remove or hide any previous Group blocks so there is just this single list."
+                I'll hide the rules box too when finished to keep it clean.
+            */}
+            {currentRound < 10 && (
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-6">
+                    <div className="flex items-center gap-2 mb-4 text-slate-700 font-bold uppercase text-sm tracking-wider">
+                        <Info className="h-4 w-4" /> Finals Format Rules
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2 text-sm text-slate-600">
+                        <div className="flex justify-between border-b border-slate-200 py-1">
+                            <span>SF1</span>
+                            <span className="font-mono font-bold">1st Group A vs 2nd Group B</span>
+                        </div>
+                        <div className="flex justify-between border-b border-slate-200 py-1">
+                            <span>SF2</span>
+                            <span className="font-mono font-bold">1st Group B vs 2nd Group A</span>
+                        </div>
+                        <div className="flex justify-between border-b border-slate-200 py-1">
+                            <span>5th/6th</span>
+                            <span className="font-mono font-bold">3rd Group A vs 3rd Group B</span>
+                        </div>
+                        <div className="flex justify-between border-b border-slate-200 py-1">
+                            <span>7th/8th</span>
+                            <span className="font-mono font-bold">4th Group A vs 4th Group B</span>
+                        </div>
+                        <div className="flex justify-between border-b border-slate-200 py-1">
+                            <span>3rd/4th</span>
+                            <span className="font-mono font-bold">Loser SF1 vs Loser SF2</span>
+                        </div>
+                        <div className="flex justify-between border-b border-slate-200 py-1">
+                            <span>Final</span>
+                            <span className="font-mono font-bold">Winner SF1 vs Winner SF2</span>
+                        </div>
+                    </div>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2 text-sm text-slate-600">
-                    <div className="flex justify-between border-b border-slate-200 py-1">
-                        <span>SF1</span>
-                        <span className="font-mono font-bold">1st Group A vs 2nd Group B</span>
-                    </div>
-                    <div className="flex justify-between border-b border-slate-200 py-1">
-                        <span>SF2</span>
-                        <span className="font-mono font-bold">1st Group B vs 2nd Group A</span>
-                    </div>
-                    <div className="flex justify-between border-b border-slate-200 py-1">
-                        <span>5th/6th</span>
-                        <span className="font-mono font-bold">3rd Group A vs 3rd Group B</span>
-                    </div>
-                    <div className="flex justify-between border-b border-slate-200 py-1">
-                        <span>7th/8th</span>
-                        <span className="font-mono font-bold">4th Group A vs 4th Group B</span>
-                    </div>
-                    <div className="flex justify-between border-b border-slate-200 py-1">
-                        <span>3rd/4th</span>
-                        <span className="font-mono font-bold">Loser SF1 vs Loser SF2</span>
-                    </div>
-                    <div className="flex justify-between border-b border-slate-200 py-1">
-                        <span>Final</span>
-                        <span className="font-mono font-bold">Winner SF1 vs Winner SF2</span>
-                    </div>
-                </div>
-            </div>
+            )}
         </div>
       </div>
 
@@ -595,6 +602,37 @@ function StandingsTable({ group, data }: { group: string, data: Standing[] }) {
                            <TableCell className="text-center text-red-400">{row.lost}</TableCell>
                            <TableCell className="text-center hidden sm:table-cell font-mono">{row.gd > 0 ? `+${row.gd}` : row.gd}</TableCell>
                            <TableCell className="text-center font-bold text-lg">{row.points}</TableCell>
+                       </TableRow>
+                   ))}
+               </TableBody>
+           </Table>
+        </div>
+    )
+}
+
+function FinalStandingsTable({ placings }: { placings: FinalPlacing[] }) {
+    return (
+        <div className="bg-white rounded-xl border-2 border-amber-400 shadow-[0_0_30px_-15px_rgba(245,158,11,0.3)] overflow-hidden animate-in fade-in slide-in-from-bottom-8 duration-1000">
+            <div className="bg-amber-400 p-6 border-b border-amber-500 flex justify-between items-center">
+               <h3 className="text-2xl font-bold uppercase text-slate-900 tracking-tight">Final Tournament Standings</h3>
+               <Medal className="h-8 w-8 text-slate-900" />
+           </div>
+           <Table>
+               <TableHeader>
+                   <TableRow className="bg-amber-50 hover:bg-amber-50">
+                       <TableHead className="w-16 font-bold text-slate-900">Pos</TableHead>
+                       <TableHead className="font-bold text-slate-900">Team</TableHead>
+                       <TableHead className="font-bold text-slate-900">Group</TableHead>
+                       <TableHead className="font-bold text-slate-900">Path</TableHead>
+                   </TableRow>
+               </TableHeader>
+               <TableBody>
+                   {placings.map((row) => (
+                       <TableRow key={row.teamId} className="hover:bg-amber-50/50">
+                           <TableCell className="font-display font-bold text-2xl text-slate-900">{row.position}</TableCell>
+                           <TableCell className="font-bold text-lg">{row.teamName}</TableCell>
+                           <TableCell className="text-slate-500 font-medium">Group {row.group}</TableCell>
+                           <TableCell className="text-slate-600 italic">{row.path}</TableCell>
                        </TableRow>
                    ))}
                </TableBody>
