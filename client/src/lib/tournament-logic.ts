@@ -6,6 +6,8 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 // Types
+export type TournamentFormat = 'groups' | 'round-robin';
+
 export type Team = {
   id: number;
   name: string;
@@ -13,7 +15,7 @@ export type Team = {
 };
 
 export type GameStatus = 'scheduled' | 'active' | 'finished';
-export type GameStage = 'group' | 'semi' | 'final' | 'placing';
+export type GameStage = 'group' | 'semi' | 'final' | 'placing' | 'league';
 
 export type Game = {
   id: number;
@@ -106,6 +108,112 @@ export const INITIAL_GAMES: Game[] = [
   { id: 12, roundNumber: 6, courtId: 2, stage: 'group', group: 'B', teamAId: 6, teamBId: 7, scoreA: 0, scoreB: 0, status: 'scheduled', description: 'Group B Match' },
 ];
 
+export function generateRoundRobinSchedule(): Game[] {
+    const teams = [1, 2, 3, 4, 5, 6, 7, 8];
+    const games: Game[] = [];
+    let gameId = 1;
+
+    // Standard circle method logic for generating pairings
+    const pairings: {teamA: number, teamB: number}[][] = [];
+    
+    // Circle method for 8 teams (7 rounds of 4 games)
+    // Fixed pivot: team 1. Others rotate.
+    // However, we want to split these 4-game rounds into 2-game timeslots.
+    
+    // Initial positions:
+    // 1 2 3 4
+    // 8 7 6 5
+    // Pairings: (1,8), (2,7), (3,6), (4,5)
+
+    let moving = [2, 3, 4, 5, 6, 7, 8];
+
+    for (let r = 0; r < 7; r++) {
+        const roundPairings: {teamA: number, teamB: number}[] = [];
+        
+        // 1 plays against the last in 'moving' (or first? standard is last if we shift right)
+        // Let's stick to standard visualization:
+        // Round 1:
+        // 1 vs 8
+        // 2 vs 7
+        // 3 vs 6
+        // 4 vs 5
+        
+        // Match 1: 1 vs moving[6]
+        roundPairings.push({ teamA: 1, teamB: moving[6] });
+        // Matches 2-4: moving[0]v[5], moving[1]v[4], moving[2]v[3]
+        roundPairings.push({ teamA: moving[0], teamB: moving[5] });
+        roundPairings.push({ teamA: moving[1], teamB: moving[4] });
+        roundPairings.push({ teamA: moving[2], teamB: moving[3] });
+        
+        pairings.push(roundPairings);
+
+        // Rotate moving array (last element moves to front)
+        moving.unshift(moving.pop()!);
+    }
+
+    // Now we have 7 rounds of 4 games.
+    // We need to distribute these into 14 physical rounds of 2 games.
+    // We just take the first 2 games for Round N, next 2 for Round N+1?
+    // Wait, if we do that, teams in games 3&4 rest in Round N, and teams in 1&2 rest in Round N+1.
+    // That's exactly what we want.
+
+    pairings.forEach((roundGames, idx) => {
+        // Physical Round A (idx * 2 + 1)
+        games.push({
+            id: gameId++,
+            roundNumber: (idx * 2) + 1,
+            courtId: 1,
+            stage: 'league',
+            teamAId: roundGames[0].teamA,
+            teamBId: roundGames[0].teamB,
+            scoreA: 0,
+            scoreB: 0,
+            status: 'scheduled',
+            description: 'League Match'
+        });
+        games.push({
+            id: gameId++,
+            roundNumber: (idx * 2) + 1,
+            courtId: 2,
+            stage: 'league',
+            teamAId: roundGames[1].teamA,
+            teamBId: roundGames[1].teamB,
+            scoreA: 0,
+            scoreB: 0,
+            status: 'scheduled',
+            description: 'League Match'
+        });
+
+        // Physical Round B (idx * 2 + 2)
+        games.push({
+            id: gameId++,
+            roundNumber: (idx * 2) + 2,
+            courtId: 1,
+            stage: 'league',
+            teamAId: roundGames[2].teamA,
+            teamBId: roundGames[2].teamB,
+            scoreA: 0,
+            scoreB: 0,
+            status: 'scheduled',
+            description: 'League Match'
+        });
+        games.push({
+            id: gameId++,
+            roundNumber: (idx * 2) + 2,
+            courtId: 2,
+            stage: 'league',
+            teamAId: roundGames[3].teamA,
+            teamBId: roundGames[3].teamB,
+            scoreA: 0,
+            scoreB: 0,
+            status: 'scheduled',
+            description: 'League Match'
+        });
+    });
+
+    return games;
+}
+
 // Logic Functions
 export function calculateStandings(games: Game[], teams: Team[]): Standing[] {
   const standings: Record<number, Standing> = {};
@@ -135,7 +243,8 @@ export function calculateStandings(games: Game[], teams: Team[]): Standing[] {
     // So we should count any game that has scores or is marked finished? 
     // Spec says "Mark the game as status: 'finished' (or keep it finished)." when editing.
     // So checking status === 'finished' is still correct, as editing will ensure it's finished.
-    if (game.status === 'finished' && game.stage === 'group' && game.teamAId && game.teamBId) {
+    // Note: For Round Robin, stage is 'league'. For Groups, stage is 'group'.
+    if (game.status === 'finished' && (game.stage === 'group' || game.stage === 'league') && game.teamAId && game.teamBId) {
       const teamA = standings[game.teamAId];
       const teamB = standings[game.teamBId];
 
