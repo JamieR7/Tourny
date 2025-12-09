@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import confetti from "canvas-confetti";
 import { 
   INITIAL_TEAMS, 
   INITIAL_GAMES, 
@@ -14,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Play, Pause, RotateCcw, ChevronRight, Trophy, Minus, Plus, Info } from "lucide-react";
+import { Play, Pause, RotateCcw, ChevronRight, Trophy, Minus, Plus, Info, Sparkles } from "lucide-react";
 
 export default function TournamentPage() {
   const [teams, setTeams] = useState<Team[]>(INITIAL_TEAMS);
@@ -24,6 +25,11 @@ export default function TournamentPage() {
   const [timeLeft, setTimeLeft] = useState(10 * 60);
   const [timerActive, setTimerActive] = useState(false);
   const [timerFinished, setTimerFinished] = useState(false);
+  
+  // Celebration State
+  const [showCelebration, setShowCelebration] = useState(false);
+  const [finalResultsRevealed, setFinalResultsRevealed] = useState(false);
+  const resultsRef = useRef<HTMLDivElement>(null);
 
   const audioContextRef = useRef<AudioContext | null>(null);
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -75,6 +81,31 @@ export default function TournamentPage() {
           playBeep();
       }
   }, [timeLeft, timerActive]);
+
+  // --- Confetti Effect ---
+  useEffect(() => {
+    if (showCelebration) {
+      const duration = 15 * 1000;
+      const animationEnd = Date.now() + duration;
+      const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 50 };
+
+      const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;
+
+      const interval: NodeJS.Timeout = setInterval(function() {
+        const timeLeft = animationEnd - Date.now();
+
+        if (timeLeft <= 0) {
+          return clearInterval(interval);
+        }
+
+        const particleCount = 50 * (timeLeft / duration);
+        confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } });
+        confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } });
+      }, 250);
+
+      return () => clearInterval(interval);
+    }
+  }, [showCelebration]);
 
   const initAudio = () => {
     if (!audioContextRef.current) {
@@ -142,10 +173,12 @@ export default function TournamentPage() {
   };
 
   const handleNextRound = () => {
+    // 1. Mark current round games as finished
     const updatedGames = games.map(g => 
       g.roundNumber === currentRound ? { ...g, status: 'finished' as const } : g
     );
 
+    // 2. Logic for finals generation after Round 6
     let finalGames = [...updatedGames];
     
     if (currentRound === 6) {
@@ -156,7 +189,9 @@ export default function TournamentPage() {
       finalGames = [...updatedGames, ...newFixtures];
     }
 
+    // 3. Logic for updating Finals (R9) participants after Semi-Finals (R7)
     if (currentRound === 7) {
+        // Find SF winners
         const sf1 = finalGames.find(g => g.roundNumber === 7 && g.courtId === 1);
         const sf2 = finalGames.find(g => g.roundNumber === 7 && g.courtId === 2);
         
@@ -180,14 +215,35 @@ export default function TournamentPage() {
     }
 
     setGames(finalGames);
-    setCurrentRound(prev => prev + 1);
-    resetTimer();
+    
+    // Check if tournament is complete (Round 9 finished)
+    // Actually, we increment round AFTER processing. 
+    // If currentRound is 9, next is 10 (completed)
+    if (currentRound >= 9) {
+        setCurrentRound(10);
+        setShowCelebration(true);
+        resetTimer(); // Stop timer if running
+    } else {
+        setCurrentRound(prev => prev + 1);
+        resetTimer();
+    }
+  };
+
+  const handleRevealResults = () => {
+    setShowCelebration(false);
+    setFinalResultsRevealed(true);
+    // Use timeout to allow DOM to update visibility before scrolling
+    setTimeout(() => {
+        resultsRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
   };
 
   const resetTournament = () => {
       if (confirm("Are you sure? This will clear all scores.")) {
           setGames(INITIAL_GAMES);
           setCurrentRound(1);
+          setShowCelebration(false);
+          setFinalResultsRevealed(false);
           resetTimer();
       }
   };
@@ -201,7 +257,33 @@ export default function TournamentPage() {
   const standingsB = calculateStandings(games, teams.filter(t => t.group === 'B'));
 
   return (
-    <div className="min-h-screen bg-white text-slate-900 font-sans p-4 md:p-8 max-w-7xl mx-auto">
+    <div className="min-h-screen bg-white text-slate-900 font-sans p-4 md:p-8 max-w-7xl mx-auto relative">
+      
+      {/* Celebration Overlay */}
+      {showCelebration && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in duration-500">
+          <div className="text-center space-y-8 p-8 max-w-2xl mx-4">
+            <div className="space-y-4">
+               <h2 className="text-5xl md:text-7xl font-bold text-white tracking-tight animate-bounce">
+                  Congratulations!
+               </h2>
+               <p className="text-xl md:text-2xl text-slate-200 font-medium">
+                  High-five the other teams; we’ll see the final results soon.
+               </p>
+            </div>
+            
+            <Button 
+               size="lg" 
+               className="h-20 px-12 text-2xl font-bold uppercase tracking-widest bg-amber-500 hover:bg-amber-600 text-black shadow-[0_0_40px_-10px_rgba(245,158,11,0.5)] transform hover:scale-105 transition-all"
+               onClick={handleRevealResults}
+            >
+               <Sparkles className="mr-3 h-8 w-8" />
+               Reveal Final Table
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Header & Timer */}
       <header className="mb-8 flex flex-col items-center gap-6">
         <h1 className="text-3xl md:text-4xl font-bold uppercase tracking-tight text-slate-900 font-display">
@@ -248,7 +330,7 @@ export default function TournamentPage() {
             </Button>
           </div>
           <div className="mt-4 text-slate-500 font-bold uppercase tracking-widest text-sm">
-             Round {currentRound} / {currentRound > 6 ? 9 : 6}
+             Round {currentRound > 9 ? 9 : currentRound} / 9
           </div>
         </div>
       </header>
@@ -339,7 +421,7 @@ export default function TournamentPage() {
                   </div>
                 ) : (
                   <div className="h-48 flex items-center justify-center text-slate-400 font-bold uppercase text-xl">
-                    No Game Scheduled
+                    {currentRound > 9 ? "Tournament Complete" : "No Game Scheduled"}
                   </div>
                 )}
               </CardContent>
@@ -350,13 +432,13 @@ export default function TournamentPage() {
 
       {/* Next Round Controls */}
       <div className="flex justify-center mb-12">
-        {currentRound < 9 ? (
+        {currentRound < 10 ? (
              <Button 
              size="lg" 
              className="h-16 px-12 text-2xl font-bold uppercase tracking-widest bg-blue-600 hover:bg-blue-700 shadow-lg cursor-pointer transform hover:scale-105 transition-all"
              onClick={handleNextRound}
            >
-             Next Round <ChevronRight className="ml-2 h-8 w-8" />
+             {currentRound === 9 ? "Finish Tournament" : "Next Round"} <ChevronRight className="ml-2 h-8 w-8" />
            </Button>
         ) : (
             <div className="text-3xl font-bold text-green-600 uppercase border-4 border-green-600 p-4 rounded-xl">Tournament Complete</div>
@@ -428,9 +510,15 @@ export default function TournamentPage() {
         </div>
 
         {/* Standings */}
-        <div className="space-y-8">
-            <StandingsTable group="A" data={standingsA} />
-            <StandingsTable group="B" data={standingsB} />
+        <div className="space-y-8" ref={resultsRef}>
+            {/* Logic: If tournament is NOT complete, show current standings. 
+                If complete, show ONLY if revealed. */}
+            {(currentRound < 10 || finalResultsRevealed) && (
+                <>
+                    <StandingsTable group="A" data={standingsA} />
+                    <StandingsTable group="B" data={standingsB} />
+                </>
+            )}
             
             {/* Finals Rules Box */}
             <div className="bg-slate-50 border border-slate-200 rounded-xl p-6">
@@ -478,7 +566,7 @@ export default function TournamentPage() {
 
 function StandingsTable({ group, data }: { group: string, data: Standing[] }) {
     return (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-700">
             <div className="bg-slate-100 p-4 border-b border-slate-200 flex justify-between items-center">
                <h3 className="font-bold uppercase text-slate-700">Group {group} Standings</h3>
                <Trophy className="h-4 w-4 text-amber-500" />
