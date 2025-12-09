@@ -32,6 +32,7 @@ export default function TournamentPage() {
   const [tournamentFormat, setTournamentFormat] = useState<TournamentFormat>('groups');
   const [teamCount, setTeamCount] = useState<number>(8);
   const [teamNames, setTeamNames] = useState<Record<number, string>>({});
+  const [courtNames, setCourtNames] = useState<Record<number, string>>({ 1: 'Court 1', 2: 'Court 2' });
 
   // Time Setup
   const [startMode, setStartMode] = useState<'now' | 'custom'>('now');
@@ -484,12 +485,17 @@ export default function TournamentPage() {
       pauseStartRef.current = null;
       setTeamCount(8); // Reset to default
       setTournamentFormat('groups'); // Reset to default
+      setCourtNames({ 1: 'Court 1', 2: 'Court 2' }); // Reset court names
       setShowResetModal(false);
   };
 
   const getTeamName = (id: number | null) => {
     if (id === null) return "TBD";
     return teams.find(t => t.id === id)?.name || "Unknown";
+  };
+
+  const getCourtName = (courtId: number) => {
+    return courtNames[courtId] || `Court ${courtId}`;
   };
   
   // Logic for "Up Next" based on Court Queues
@@ -782,6 +788,24 @@ export default function TournamentPage() {
                              ))}
                          </div>
                      </div>
+
+                     <div className="space-y-4">
+                         <Label className={`text-lg font-semibold ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>Court Names</Label>
+                         <div className="grid grid-cols-1 gap-2">
+                             {[1, 2].map(id => (
+                                 <div key={id} className="flex items-center gap-2">
+                                     <span className={`text-sm font-mono font-bold w-8 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>{id}.</span>
+                                     <Input 
+                                         value={courtNames[id] || ''} 
+                                         onChange={(e) => setCourtNames(prev => ({ ...prev, [id]: e.target.value }))}
+                                         className={`h-10 ${theme === 'dark' ? 'bg-slate-900 border-slate-700' : 'bg-white'}`}
+                                         placeholder={`Court ${id}`}
+                                         data-testid={`input-court-name-${id}`}
+                                     />
+                                 </div>
+                             ))}
+                         </div>
+                     </div>
                  </div>
                  
                  <div className="w-full mt-8">
@@ -859,7 +883,7 @@ export default function TournamentPage() {
                     <CardHeader className="bg-slate-900 text-white py-3 px-4 relative overflow-hidden">
                       <div className="absolute bottom-0 left-0 w-full h-1 bg-amber-500"></div>
                       <div className="flex flex-row justify-between items-center relative z-10">
-                          <CardTitle className="font-display uppercase tracking-wider text-3xl font-extrabold">{court.name}</CardTitle>
+                          <CardTitle className="font-display uppercase tracking-wider text-3xl font-extrabold">{getCourtName(court.id)}</CardTitle>
                           {game && (
                               <Badge variant="secondary" className="font-sans uppercase text-xs font-bold bg-amber-400 text-slate-900 hover:bg-amber-500 px-3 py-1 rounded-full border-none">
                                   {game.stage === 'league' ? `Round ${game.roundNumber}` : game.stage}
@@ -1002,7 +1026,7 @@ export default function TournamentPage() {
                                  <TableRow key={game.id} className={`${game.roundNumber === currentRound ? (theme === 'dark' ? 'bg-slate-700/50' : 'bg-amber-50') : ''} ${theme === 'dark' ? 'hover:bg-slate-700/30' : ''}`}>
                                      <TableCell className="font-mono font-bold text-slate-500">{game.roundNumber}</TableCell>
                                      <TableCell className="text-xs font-medium text-slate-500">
-                                         {game.group ? `Group ${game.group}` : (game.description === 'League Match' ? `Court ${game.courtId}` : game.description)}
+                                         {game.group ? `Group ${game.group}` : (game.description === 'League Match' ? getCourtName(game.courtId) : game.description)}
                                      </TableCell>
                                      <TableCell className={`text-right font-medium ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>{getTeamName(game.teamAId)}</TableCell>
                                      <TableCell className="text-center">
