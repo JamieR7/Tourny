@@ -83,25 +83,7 @@ export default function TournamentPage() {
              // Use setTimeout to allow the state updates from timer stopping to settle/process
              // and to avoid direct state loop.
              setTimeout(() => {
-                 handleNextRound();
-                 // If we are NOT finished (meaning currentRound < 9 before update, or < 10 after update), start timer.
-                 // handleNextRound increments currentRound. 
-                 // So if currentRound was < 9, it becomes currentRound + 1. 
-                 // If currentRound was 9, it becomes 10 (finished).
-                 // We need to check the *new* state or predict it.
-                 // Since handleNextRound is async in state setting, we can't check currentRound immediately.
-                 // But we know the logic: if currentRound < 9, we advance and start timer.
-                 if (currentRoundRef.current < 9) {
-                     // Start next timer automatically
-                     // We need to wait for next round games to be set? 
-                     // Actually just restarting the timer is enough, the new games will render.
-                     // But we need to reset the timer time first.
-                     // handleNextRound resets timer to minutes * 60 via resetTimer(), but that stops it.
-                     // We want to START it.
-                     setTimeout(() => {
-                         toggleTimer();
-                     }, 500); // Small delay to make it feel natural
-                 }
+                 handleNextRound(true); // Pass true to indicate auto-advance
              }, 1000);
           }
         } else {
@@ -232,34 +214,8 @@ export default function TournamentPage() {
       }));
   };
 
-  const handleNextRound = () => {
+  const handleNextRound = (isAutoAdvance = false) => {
     // 1. Mark current round games as finished
-    // Need to use functional update to access latest state if called from closure, 
-    // BUT calculateStandings needs the updated games.
-    // So we do it in two steps or use a ref for games (complicated).
-    // React state updates are batched. 
-    // We can rely on 'games' being current if this is triggered by button click.
-    // If triggered by timer (via setTimeout), 'games' might be stale in the closure?
-    // No, because handleNextRound is recreated on every render if not memoized, 
-    // so if we call it from the component scope it has access to current 'games'.
-    // BUT if we call it from setTimeout inside useEffect which has [] deps (or timerActive deps), 
-    // we might have stale 'handleNextRound'.
-    // Actually, I didn't wrap handleNextRound in useCallback. 
-    // So if I call it from inside the useEffect closure, it will be the handleNextRound from the *render cycle where the effect started*.
-    // Which means 'games' will be stale (from when timer started).
-    // FIX: Use functional state update for setGames, AND perform logic inside the setter or a separate effect?
-    // OR: Add 'games' to useEffect dependency? No, that restarts timer on every score change.
-    // BEST FIX: Use a ref for games.
-    
-    // Actually, I'll implement the "Ref for games" pattern to be safe.
-    // But since I can't easily refactor everything now, I'll rely on a simpler trick:
-    // Pass the games to handleNextRound? No.
-    // Let's use a ref for games.
-    
-    // ... wait, I can just use functional updates for setGames, 
-    // but I need the *result* of the update to calculate standings.
-    // I will use a ref for the latest games state.
-    
     const currentGames = gamesRef.current; // Use the ref!
 
     const updatedGames = currentGames.map(g => 
@@ -309,6 +265,15 @@ export default function TournamentPage() {
     } else {
         setCurrentRound(prev => prev + 1);
         resetTimer();
+        
+        if (isAutoAdvance) {
+            // Wait for state to settle then restart timer
+            setTimeout(() => {
+                initAudio();
+                endTimeRef.current = Date.now() + (timerMinutes * 60 * 1000);
+                setTimerActive(true);
+            }, 500);
+        }
     }
   };
 
@@ -540,7 +505,7 @@ export default function TournamentPage() {
              <Button 
              size="lg" 
              className="h-16 px-12 text-2xl font-bold uppercase tracking-widest bg-amber-500 hover:bg-amber-600 text-slate-900 shadow-lg cursor-pointer transform hover:scale-105 transition-all"
-             onClick={handleNextRound}
+             onClick={() => handleNextRound(false)}
            >
              {currentRound === 9 ? "Finish Tournament" : "Next Round"} <ChevronRight className="ml-2 h-8 w-8" />
            </Button>
