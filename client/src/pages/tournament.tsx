@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Play, Pause, RotateCcw, ChevronRight, Trophy, Minus, Plus } from "lucide-react";
+import { Play, Pause, RotateCcw, ChevronRight, Trophy, Minus, Plus, Info } from "lucide-react";
 
 export default function TournamentPage() {
   const [teams, setTeams] = useState<Team[]>(INITIAL_TEAMS);
@@ -57,17 +57,12 @@ export default function TournamentPage() {
         } else {
           setTimeLeft(remaining);
           if (remaining <= 10) {
-             // Play beep only once per second. 
-             // We can check if we just crossed a second boundary, but simplified:
-             // Just play it if the fractional part is close to 0? No, simpler:
-             // The interval is 200ms in spec, but I used 1000ms. 
-             // To match spec "Update display every ~200 ms", I should increase frequency.
+             // Play beep logic if needed
           }
         }
       }, 200); 
     } else {
-      endTimeRef.current = null; // Pause: clear end time. 
-      // Note: Pausing loses the exact millisecond fraction, which is fine for this app.
+      endTimeRef.current = null;
       if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
     }
     return () => {
@@ -75,13 +70,11 @@ export default function TournamentPage() {
     };
   }, [timerActive]);
 
-  // Separate effect for beeps to avoid spamming in the high-frequency interval
   useEffect(() => {
       if (timerActive && timeLeft <= 10 && timeLeft > 0) {
           playBeep();
       }
   }, [timeLeft, timerActive]);
-
 
   const initAudio = () => {
     if (!audioContextRef.current) {
@@ -117,10 +110,8 @@ export default function TournamentPage() {
   const toggleTimer = () => {
       if (!timerActive) {
           initAudio();
-          // If resuming, calculate new end time based on current timeLeft
           endTimeRef.current = Date.now() + timeLeft * 1000;
       } else {
-          // Pausing
           endTimeRef.current = null;
       }
       setTimerActive(!timerActive);
@@ -151,12 +142,10 @@ export default function TournamentPage() {
   };
 
   const handleNextRound = () => {
-    // 1. Mark current round games as finished
     const updatedGames = games.map(g => 
       g.roundNumber === currentRound ? { ...g, status: 'finished' as const } : g
     );
 
-    // 2. Logic for finals generation after Round 6
     let finalGames = [...updatedGames];
     
     if (currentRound === 6) {
@@ -167,9 +156,7 @@ export default function TournamentPage() {
       finalGames = [...updatedGames, ...newFixtures];
     }
 
-    // 3. Logic for updating Finals (R9) participants after Semi-Finals (R7)
     if (currentRound === 7) {
-        // Find SF winners
         const sf1 = finalGames.find(g => g.roundNumber === 7 && g.courtId === 1);
         const sf2 = finalGames.find(g => g.roundNumber === 7 && g.courtId === 2);
         
@@ -271,13 +258,20 @@ export default function TournamentPage() {
         {COURTS.map(court => {
           const game = activeGames.find(g => g.courtId === court.id);
           return (
-            <Card key={court.id} className="border-4 border-slate-900 shadow-[8px_8px_0px_0px_rgba(15,23,42,1)] rounded-xl overflow-hidden">
-              <CardHeader className="bg-slate-900 text-white py-3 flex flex-row justify-between items-center">
-                <CardTitle className="font-display uppercase tracking-wider text-xl">{court.name}</CardTitle>
-                {game && (
-                    <Badge variant="secondary" className="font-mono uppercase text-xs font-bold bg-white text-black">
-                        {game.stage} {game.group ? `Group ${game.group}` : ''}
-                    </Badge>
+            <Card key={court.id} className="border-4 border-slate-900 shadow-[8px_8px_0px_0px_rgba(15,23,42,1)] rounded-xl overflow-hidden relative">
+              <CardHeader className="bg-slate-900 text-white py-3">
+                <div className="flex flex-row justify-between items-center mb-1">
+                    <CardTitle className="font-display uppercase tracking-wider text-xl">{court.name}</CardTitle>
+                    {game && (
+                        <Badge variant="secondary" className="font-mono uppercase text-xs font-bold bg-white text-black">
+                            {game.stage}
+                        </Badge>
+                    )}
+                </div>
+                {game && game.stage !== 'group' && (
+                    <div className="text-xs text-slate-300 font-mono uppercase tracking-wide">
+                        {game.description}
+                    </div>
                 )}
               </CardHeader>
               <CardContent className="p-6">
@@ -285,7 +279,10 @@ export default function TournamentPage() {
                   <div className="flex flex-col gap-6">
                     {/* Team A */}
                     <div className="flex items-center justify-between">
-                      <div className="text-xl md:text-2xl font-bold truncate max-w-[180px]">{getTeamName(game.teamAId)}</div>
+                      <div className="flex flex-col">
+                          <div className="text-xl md:text-2xl font-bold truncate max-w-[180px]">{getTeamName(game.teamAId)}</div>
+                          {game.sourceA && <div className="text-xs text-slate-500 font-medium">{game.sourceA}</div>}
+                      </div>
                       <div className="flex items-center gap-3">
                         <Button 
                           variant="outline" 
@@ -313,7 +310,10 @@ export default function TournamentPage() {
 
                     {/* Team B */}
                     <div className="flex items-center justify-between">
-                      <div className="text-xl md:text-2xl font-bold truncate max-w-[180px]">{getTeamName(game.teamBId)}</div>
+                      <div className="flex flex-col">
+                          <div className="text-xl md:text-2xl font-bold truncate max-w-[180px]">{getTeamName(game.teamBId)}</div>
+                          {game.sourceB && <div className="text-xs text-slate-500 font-medium">{game.sourceB}</div>}
+                      </div>
                       <div className="flex items-center gap-3">
                         <Button 
                           variant="outline" 
@@ -363,47 +363,62 @@ export default function TournamentPage() {
         )}
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-8">
+      <div className="grid lg:grid-cols-2 gap-8 mb-12">
         {/* Fixtures Table */}
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-[500px]">
            <div className="bg-slate-100 p-4 border-b border-slate-200">
                <h3 className="font-bold uppercase text-slate-700">All Fixtures</h3>
            </div>
-           <div className="h-[400px] overflow-y-auto">
+           <div className="flex-1 overflow-y-auto">
                <Table>
-                   <TableHeader>
+                   <TableHeader className="bg-white sticky top-0 z-10 shadow-sm">
                        <TableRow>
                            <TableHead className="w-16">Rnd</TableHead>
-                           <TableHead>Court</TableHead>
-                           <TableHead>Stage</TableHead>
-                           <TableHead className="text-right">Match</TableHead>
-                           <TableHead className="text-center">Score</TableHead>
-                           <TableHead>Status</TableHead>
+                           <TableHead className="w-40">Match</TableHead>
+                           <TableHead className="text-right">Team A</TableHead>
+                           <TableHead className="text-center w-24">Score</TableHead>
+                           <TableHead>Team B</TableHead>
                        </TableRow>
                    </TableHeader>
                    <TableBody>
-                       {games.map(game => (
+                       {/* Group Stage Header */}
+                       <TableRow className="bg-slate-50 hover:bg-slate-50">
+                           <TableCell colSpan={5} className="font-bold text-xs uppercase text-slate-500 py-2 text-center tracking-widest">Group Stage</TableCell>
+                       </TableRow>
+                       {games.filter(g => g.stage === 'group').map(game => (
                            <TableRow key={game.id} className={game.roundNumber === currentRound ? "bg-blue-50" : ""}>
                                <TableCell className="font-mono font-bold text-slate-500">{game.roundNumber}</TableCell>
-                               <TableCell className="font-medium">Court {game.courtId}</TableCell>
-                               <TableCell className="text-xs uppercase font-bold text-slate-500">
-                                   <Badge variant="outline" className="text-[10px] px-1 py-0 h-5 border-slate-300 bg-white">
-                                       {game.stage}
-                                   </Badge>
+                               <TableCell className="text-xs font-medium text-slate-500">
+                                   {game.group ? `Group ${game.group}` : game.description}
+                               </TableCell>
+                               <TableCell className="text-right font-medium">{getTeamName(game.teamAId)}</TableCell>
+                               <TableCell className="text-center font-mono font-bold bg-slate-100 rounded">
+                                   {game.scoreA} - {game.scoreB}
+                               </TableCell>
+                               <TableCell className="font-medium">{getTeamName(game.teamBId)}</TableCell>
+                           </TableRow>
+                       ))}
+                       
+                       {/* Finals Header */}
+                       <TableRow className="bg-slate-50 hover:bg-slate-50 border-t-2 border-slate-100">
+                           <TableCell colSpan={5} className="font-bold text-xs uppercase text-slate-500 py-2 text-center tracking-widest">Finals & Placement</TableCell>
+                       </TableRow>
+                       {games.filter(g => g.stage !== 'group').map(game => (
+                           <TableRow key={game.id} className={game.roundNumber === currentRound ? "bg-blue-50" : ""}>
+                               <TableCell className="font-mono font-bold text-slate-500">{game.roundNumber}</TableCell>
+                               <TableCell className="text-xs font-medium text-slate-500">
+                                    <div className="truncate w-32" title={game.description}>{game.description}</div>
                                </TableCell>
                                <TableCell className="text-right font-medium">
-                                   {getTeamName(game.teamAId)} <span className="text-slate-400 mx-1">vs</span> {getTeamName(game.teamBId)}
+                                   <div>{getTeamName(game.teamAId)}</div>
+                                   {game.sourceA && <div className="text-[10px] text-slate-400">{game.sourceA}</div>}
                                </TableCell>
                                <TableCell className="text-center font-mono font-bold bg-slate-100 rounded">
                                    {game.scoreA} - {game.scoreB}
                                </TableCell>
-                               <TableCell>
-                                   {game.status === 'finished' ? 
-                                       <Badge variant="outline" className="bg-slate-100 text-slate-600 border-slate-300">Done</Badge> : 
-                                       game.roundNumber === currentRound ? 
-                                       <Badge className="bg-green-100 text-green-700 border-green-200 animate-pulse">Live</Badge> : 
-                                       <span className="text-slate-300 text-xs">Wait</span>
-                                   }
+                               <TableCell className="font-medium">
+                                   <div>{getTeamName(game.teamBId)}</div>
+                                   {game.sourceB && <div className="text-[10px] text-slate-400">{game.sourceB}</div>}
                                </TableCell>
                            </TableRow>
                        ))}
@@ -416,6 +431,39 @@ export default function TournamentPage() {
         <div className="space-y-8">
             <StandingsTable group="A" data={standingsA} />
             <StandingsTable group="B" data={standingsB} />
+            
+            {/* Finals Rules Box */}
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-6">
+                <div className="flex items-center gap-2 mb-4 text-slate-700 font-bold uppercase text-sm tracking-wider">
+                    <Info className="h-4 w-4" /> Finals Format Rules
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2 text-sm text-slate-600">
+                    <div className="flex justify-between border-b border-slate-200 py-1">
+                        <span>SF1</span>
+                        <span className="font-mono font-bold">1st Group A vs 2nd Group B</span>
+                    </div>
+                    <div className="flex justify-between border-b border-slate-200 py-1">
+                        <span>SF2</span>
+                        <span className="font-mono font-bold">1st Group B vs 2nd Group A</span>
+                    </div>
+                    <div className="flex justify-between border-b border-slate-200 py-1">
+                        <span>5th/6th</span>
+                        <span className="font-mono font-bold">3rd Group A vs 3rd Group B</span>
+                    </div>
+                    <div className="flex justify-between border-b border-slate-200 py-1">
+                        <span>7th/8th</span>
+                        <span className="font-mono font-bold">4th Group A vs 4th Group B</span>
+                    </div>
+                    <div className="flex justify-between border-b border-slate-200 py-1">
+                        <span>3rd/4th</span>
+                        <span className="font-mono font-bold">Loser SF1 vs Loser SF2</span>
+                    </div>
+                    <div className="flex justify-between border-b border-slate-200 py-1">
+                        <span>Final</span>
+                        <span className="font-mono font-bold">Winner SF1 vs Winner SF2</span>
+                    </div>
+                </div>
+            </div>
         </div>
       </div>
 

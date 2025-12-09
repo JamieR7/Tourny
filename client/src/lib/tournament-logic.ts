@@ -26,6 +26,10 @@ export type Game = {
   scoreA: number;
   scoreB: number;
   status: GameStatus;
+  // New explanatory fields
+  description: string; // e.g., "Semi-final 1 (1A vs 2B)"
+  sourceA?: string;    // e.g., "1st Group A"
+  sourceB?: string;    // e.g., "2nd Group B"
 };
 
 export type Court = {
@@ -72,23 +76,23 @@ export const COURTS: Court[] = [
 // R3: 1v4, 2v3
 export const INITIAL_GAMES: Game[] = [
   // Round 1
-  { id: 1, roundNumber: 1, courtId: 1, stage: 'group', group: 'A', teamAId: 1, teamBId: 2, scoreA: 0, scoreB: 0, status: 'scheduled' },
-  { id: 2, roundNumber: 1, courtId: 2, stage: 'group', group: 'B', teamAId: 5, teamBId: 6, scoreA: 0, scoreB: 0, status: 'scheduled' },
+  { id: 1, roundNumber: 1, courtId: 1, stage: 'group', group: 'A', teamAId: 1, teamBId: 2, scoreA: 0, scoreB: 0, status: 'scheduled', description: 'Group A Match' },
+  { id: 2, roundNumber: 1, courtId: 2, stage: 'group', group: 'B', teamAId: 5, teamBId: 6, scoreA: 0, scoreB: 0, status: 'scheduled', description: 'Group B Match' },
   // Round 2
-  { id: 3, roundNumber: 2, courtId: 1, stage: 'group', group: 'A', teamAId: 3, teamBId: 4, scoreA: 0, scoreB: 0, status: 'scheduled' },
-  { id: 4, roundNumber: 2, courtId: 2, stage: 'group', group: 'B', teamAId: 7, teamBId: 8, scoreA: 0, scoreB: 0, status: 'scheduled' },
+  { id: 3, roundNumber: 2, courtId: 1, stage: 'group', group: 'A', teamAId: 3, teamBId: 4, scoreA: 0, scoreB: 0, status: 'scheduled', description: 'Group A Match' },
+  { id: 4, roundNumber: 2, courtId: 2, stage: 'group', group: 'B', teamAId: 7, teamBId: 8, scoreA: 0, scoreB: 0, status: 'scheduled', description: 'Group B Match' },
   // Round 3
-  { id: 5, roundNumber: 3, courtId: 1, stage: 'group', group: 'A', teamAId: 1, teamBId: 3, scoreA: 0, scoreB: 0, status: 'scheduled' },
-  { id: 6, roundNumber: 3, courtId: 2, stage: 'group', group: 'B', teamAId: 5, teamBId: 7, scoreA: 0, scoreB: 0, status: 'scheduled' },
+  { id: 5, roundNumber: 3, courtId: 1, stage: 'group', group: 'A', teamAId: 1, teamBId: 3, scoreA: 0, scoreB: 0, status: 'scheduled', description: 'Group A Match' },
+  { id: 6, roundNumber: 3, courtId: 2, stage: 'group', group: 'B', teamAId: 5, teamBId: 7, scoreA: 0, scoreB: 0, status: 'scheduled', description: 'Group B Match' },
   // Round 4
-  { id: 7, roundNumber: 4, courtId: 1, stage: 'group', group: 'A', teamAId: 2, teamBId: 4, scoreA: 0, scoreB: 0, status: 'scheduled' },
-  { id: 8, roundNumber: 4, courtId: 2, stage: 'group', group: 'B', teamAId: 6, teamBId: 8, scoreA: 0, scoreB: 0, status: 'scheduled' },
+  { id: 7, roundNumber: 4, courtId: 1, stage: 'group', group: 'A', teamAId: 2, teamBId: 4, scoreA: 0, scoreB: 0, status: 'scheduled', description: 'Group A Match' },
+  { id: 8, roundNumber: 4, courtId: 2, stage: 'group', group: 'B', teamAId: 6, teamBId: 8, scoreA: 0, scoreB: 0, status: 'scheduled', description: 'Group B Match' },
   // Round 5
-  { id: 9, roundNumber: 5, courtId: 1, stage: 'group', group: 'A', teamAId: 1, teamBId: 4, scoreA: 0, scoreB: 0, status: 'scheduled' },
-  { id: 10, roundNumber: 5, courtId: 2, stage: 'group', group: 'B', teamAId: 5, teamBId: 8, scoreA: 0, scoreB: 0, status: 'scheduled' },
+  { id: 9, roundNumber: 5, courtId: 1, stage: 'group', group: 'A', teamAId: 1, teamBId: 4, scoreA: 0, scoreB: 0, status: 'scheduled', description: 'Group A Match' },
+  { id: 10, roundNumber: 5, courtId: 2, stage: 'group', group: 'B', teamAId: 5, teamBId: 8, scoreA: 0, scoreB: 0, status: 'scheduled', description: 'Group B Match' },
   // Round 6
-  { id: 11, roundNumber: 6, courtId: 1, stage: 'group', group: 'A', teamAId: 2, teamBId: 3, scoreA: 0, scoreB: 0, status: 'scheduled' },
-  { id: 12, roundNumber: 6, courtId: 2, stage: 'group', group: 'B', teamAId: 6, teamBId: 7, scoreA: 0, scoreB: 0, status: 'scheduled' },
+  { id: 11, roundNumber: 6, courtId: 1, stage: 'group', group: 'A', teamAId: 2, teamBId: 3, scoreA: 0, scoreB: 0, status: 'scheduled', description: 'Group A Match' },
+  { id: 12, roundNumber: 6, courtId: 2, stage: 'group', group: 'B', teamAId: 6, teamBId: 7, scoreA: 0, scoreB: 0, status: 'scheduled', description: 'Group B Match' },
 ];
 
 // Logic Functions
@@ -172,7 +176,10 @@ export function generateFinalsFixtures(standingsA: Standing[], standingsB: Stand
     teamBId: standingsB[1].teamId,
     scoreA: 0,
     scoreB: 0,
-    status: 'scheduled'
+    status: 'scheduled',
+    description: 'Semi-final 1 (1st A vs 2nd B)',
+    sourceA: '1st Group A',
+    sourceB: '2nd Group B'
   });
 
   // SF2: 1st B vs 2nd A (Court 2)
@@ -185,7 +192,10 @@ export function generateFinalsFixtures(standingsA: Standing[], standingsB: Stand
     teamBId: standingsA[1].teamId,
     scoreA: 0,
     scoreB: 0,
-    status: 'scheduled'
+    status: 'scheduled',
+    description: 'Semi-final 2 (1st B vs 2nd A)',
+    sourceA: '1st Group B',
+    sourceB: '2nd Group A'
   });
 
   // R8: Placing Games (5th-8th)
@@ -199,7 +209,10 @@ export function generateFinalsFixtures(standingsA: Standing[], standingsB: Stand
     teamBId: standingsB[2].teamId,
     scoreA: 0,
     scoreB: 0,
-    status: 'scheduled'
+    status: 'scheduled',
+    description: '5th/6th Playoff (3rd A vs 3rd B)',
+    sourceA: '3rd Group A',
+    sourceB: '3rd Group B'
   });
 
   // 7th/8th: 4th A vs 4th B (Court 2)
@@ -212,7 +225,10 @@ export function generateFinalsFixtures(standingsA: Standing[], standingsB: Stand
     teamBId: standingsB[3].teamId,
     scoreA: 0,
     scoreB: 0,
-    status: 'scheduled'
+    status: 'scheduled',
+    description: '7th/8th Playoff (4th A vs 4th B)',
+    sourceA: '4th Group A',
+    sourceB: '4th Group B'
   });
 
   // R9: Finals & 3rd Place
@@ -226,7 +242,10 @@ export function generateFinalsFixtures(standingsA: Standing[], standingsB: Stand
     teamBId: null,
     scoreA: 0,
     scoreB: 0,
-    status: 'scheduled'
+    status: 'scheduled',
+    description: 'Grand Final (Winner SF1 vs Winner SF2)',
+    sourceA: 'Winner SF1',
+    sourceB: 'Winner SF2'
   });
 
   // 3rd Place: Loser SF1 vs Loser SF2 (Court 2)
@@ -239,7 +258,10 @@ export function generateFinalsFixtures(standingsA: Standing[], standingsB: Stand
     teamBId: null,
     scoreA: 0,
     scoreB: 0,
-    status: 'scheduled'
+    status: 'scheduled',
+    description: '3rd/4th Playoff (Loser SF1 vs Loser SF2)',
+    sourceA: 'Loser SF1',
+    sourceB: 'Loser SF2'
   });
 
   return games;
