@@ -19,7 +19,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Play, Pause, RotateCcw, ChevronRight, Trophy, Minus, Plus, Info, Sparkles, Medal } from "lucide-react";
+import { Play, Pause, RotateCcw, ChevronRight, Trophy, Minus, Plus, Info, Sparkles, Medal, Moon, Sun, ArrowUp, ArrowDown } from "lucide-react";
 
 export default function TournamentPage() {
   const [teams, setTeams] = useState<Team[]>(INITIAL_TEAMS);
@@ -31,6 +31,9 @@ export default function TournamentPage() {
   const [timerFinished, setTimerFinished] = useState(false);
   const [autoAdvance, setAutoAdvance] = useState(true);
   
+  // Theme State
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+
   // Celebration State
   const [showCelebration, setShowCelebration] = useState(false);
   const [finalResultsRevealed, setFinalResultsRevealed] = useState(false);
@@ -51,6 +54,17 @@ export default function TournamentPage() {
   useEffect(() => {
     currentRoundRef.current = currentRound;
   }, [currentRound]);
+
+  // Theme Effect
+  useEffect(() => {
+    if (theme === 'dark') {
+      document.body.classList.add('dark');
+      document.body.classList.remove('light');
+    } else {
+      document.body.classList.add('light');
+      document.body.classList.remove('dark');
+    }
+  }, [theme]);
 
   // --- Timer Logic ---
   useEffect(() => {
@@ -194,7 +208,12 @@ export default function TournamentPage() {
     setGames(prev => prev.map(g => {
       if (g.id !== gameId) return g;
       const newScore = team === 'A' ? Math.max(0, g.scoreA + delta) : Math.max(0, g.scoreB + delta);
-      return { ...g, [team === 'A' ? 'scoreA' : 'scoreB']: newScore };
+      // Mark as finished if editing a game
+      return { 
+          ...g, 
+          [team === 'A' ? 'scoreA' : 'scoreB']: newScore,
+          status: 'finished'
+      };
     }));
   };
 
@@ -306,13 +325,31 @@ export default function TournamentPage() {
     if (id === null) return "TBD";
     return teams.find(t => t.id === id)?.name || "Unknown";
   };
+  
+  // Logic for "Up Next" based on Court Queues
+  // We can derive "queue" from the rounds structure.
+  // Court 1 Queue: All games with courtId=1, sorted by roundNumber
+  // Court 2 Queue: All games with courtId=2, sorted by roundNumber
+  // Current Index = currentRound - 1 (since array is 0-indexed and round starts at 1)
+  const getUpNext = (courtId: number) => {
+      const courtQueue = games.filter(g => g.courtId === courtId).sort((a,b) => a.roundNumber - b.roundNumber);
+      // Since roundNumber corresponds to index + 1 for INITIAL_GAMES, but finals are generated later.
+      // However, we can just find the game with roundNumber === currentRound + 1
+      // The user asked to maintain a courtQueue and currentIndex.
+      // Since we are re-rendering, we can compute the next game directly.
+      // "Recompute 'Up next' purely from courtQueues[courtId][currentIndex + 1]"
+      // currentIndex corresponds to the current active game index.
+      
+      const nextGame = courtQueue.find(g => g.roundNumber === currentRound + 1);
+      return nextGame;
+  };
 
   const standingsA = calculateStandings(games, teams.filter(t => t.group === 'A'));
   const standingsB = calculateStandings(games, teams.filter(t => t.group === 'B'));
   const finalPlacings = currentRound >= 10 ? calculateFinalPlacings(games, teams) : [];
 
   return (
-    <div className="min-h-screen bg-white text-slate-900 font-sans p-4 md:p-8 max-w-7xl mx-auto relative">
+    <div className={`min-h-screen font-sans p-4 md:p-8 max-w-7xl mx-auto relative transition-colors duration-300 ${theme === 'dark' ? 'bg-slate-900 text-slate-100' : 'bg-white text-slate-900'}`}>
       
       {/* Celebration Overlay */}
       {showCelebration && (
@@ -340,15 +377,26 @@ export default function TournamentPage() {
       )}
 
       {/* Header & Timer */}
-      <header className="mb-8 flex flex-col items-center gap-6">
-        <h1 className="text-3xl md:text-4xl font-bold uppercase tracking-tight text-slate-900 font-display">
+      <header className="mb-8 flex flex-col items-center gap-6 relative">
+        <div className="absolute top-0 right-0">
+             <Button 
+                variant="outline" 
+                size="icon" 
+                onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+                className={`rounded-full border-2 ${theme === 'dark' ? 'border-slate-700 bg-slate-800 text-yellow-400 hover:bg-slate-700' : 'border-slate-200 bg-white text-slate-900 hover:bg-slate-100'}`}
+             >
+                 {theme === 'light' ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
+             </Button>
+        </div>
+
+        <h1 className={`text-3xl md:text-4xl font-bold uppercase tracking-tight font-display ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
           PE Tournament Planner
         </h1>
         
-        <div className="flex flex-col items-center bg-slate-50 p-6 rounded-2xl border-2 border-slate-200 shadow-sm w-full max-w-2xl">
+        <div className={`flex flex-col items-center p-6 rounded-2xl border-2 shadow-sm w-full max-w-2xl transition-colors duration-300 ${theme === 'dark' ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
           <div 
             className={`text-8xl md:text-9xl font-mono font-bold tabular-nums tracking-tighter mb-4 select-none ${
-              timeLeft <= 10 && timerActive ? "text-red-600 animate-pulse" : "text-slate-900"
+              timeLeft <= 10 && timerActive ? "text-red-600 animate-pulse" : (theme === 'dark' ? "text-white" : "text-slate-900")
             }`}
             style={{ fontFamily: 'Montserrat, sans-serif' }}
           >
@@ -357,12 +405,12 @@ export default function TournamentPage() {
           
           <div className="flex flex-wrap gap-4 items-center justify-center w-full mb-4">
             <div className="flex items-center gap-2">
-               <span className="text-sm font-semibold uppercase text-slate-500">Mins</span>
+               <span className={`text-sm font-semibold uppercase ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Mins</span>
                <Input 
                  type="number" 
                  value={timerMinutes} 
                  onChange={(e) => setTimerMinutes(Number(e.target.value))}
-                 className="w-20 text-center font-bold text-lg h-12 border-slate-300 focus:border-amber-500"
+                 className={`w-20 text-center font-bold text-lg h-12 focus:border-amber-500 ${theme === 'dark' ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'}`}
                  disabled={timerActive}
                />
             </div>
@@ -378,26 +426,26 @@ export default function TournamentPage() {
             <Button 
               size="lg" 
               variant="outline" 
-              className="h-12 px-6 border-2 border-slate-300 font-bold uppercase tracking-wide cursor-pointer hover:bg-slate-100 text-slate-700"
+              className={`h-12 px-6 border-2 font-bold uppercase tracking-wide cursor-pointer ${theme === 'dark' ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-slate-300 text-slate-700 hover:bg-slate-100'}`}
               onClick={resetTimer}
             >
               <RotateCcw className="mr-2 h-5 w-5" /> Reset
             </Button>
           </div>
 
-          <div className="flex items-center space-x-2 bg-white px-4 py-2 rounded-full border border-slate-200 shadow-sm">
+          <div className={`flex items-center space-x-2 px-4 py-2 rounded-full border shadow-sm ${theme === 'dark' ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'}`}>
              <Checkbox 
                 id="auto-advance" 
                 checked={autoAdvance} 
                 onCheckedChange={(c) => setAutoAdvance(!!c)} 
                 className="data-[state=checked]:bg-amber-500 data-[state=checked]:text-slate-900 border-slate-300"
              />
-             <Label htmlFor="auto-advance" className="text-sm font-medium text-slate-600 cursor-pointer select-none">
+             <Label htmlFor="auto-advance" className={`text-sm font-medium cursor-pointer select-none ${theme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`}>
                  Auto-advance to next round when timer ends
              </Label>
           </div>
 
-          <div className="mt-4 text-slate-500 font-bold uppercase tracking-widest text-sm">
+          <div className={`mt-4 font-bold uppercase tracking-widest text-sm ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>
              Round {currentRound > 9 ? 9 : currentRound} / 9
           </div>
         </div>
@@ -407,8 +455,10 @@ export default function TournamentPage() {
       <div className="grid md:grid-cols-2 gap-6 mb-8">
         {COURTS.map(court => {
           const game = activeGames.find(g => g.courtId === court.id);
+          const nextGame = getUpNext(court.id);
+          
           return (
-            <Card key={court.id} className="border-0 shadow-lg rounded-xl overflow-hidden relative">
+            <Card key={court.id} className={`border-0 shadow-lg rounded-xl overflow-hidden relative ${theme === 'dark' ? 'bg-slate-800' : 'bg-white'}`}>
               <CardHeader className="bg-slate-900 text-white py-4 relative overflow-hidden">
                 <div className="absolute bottom-0 left-0 w-full h-1 bg-amber-500"></div>
                 <div className="flex flex-row justify-between items-center mb-1 relative z-10">
@@ -425,31 +475,31 @@ export default function TournamentPage() {
                     </div>
                 )}
               </CardHeader>
-              <CardContent className="p-6 bg-white border border-t-0 border-slate-200 rounded-b-xl">
+              <CardContent className={`p-6 border border-t-0 rounded-b-xl ${theme === 'dark' ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
                 {game ? (
                   <div className="flex flex-col gap-6">
                     {/* Team A */}
                     <div className="flex items-center justify-between">
                       <div className="flex flex-col">
-                          <div className="text-xl md:text-2xl font-bold truncate max-w-[180px] text-slate-900">{getTeamName(game.teamAId)}</div>
+                          <div className={`text-xl md:text-2xl font-bold truncate max-w-[180px] ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{getTeamName(game.teamAId)}</div>
                           {game.sourceA && <div className="text-xs text-slate-500 font-medium">{game.sourceA}</div>}
                       </div>
                       <div className="flex items-center gap-3">
                         <Button 
                           variant="outline" 
                           size="icon" 
-                          className="h-12 w-12 border-2 border-slate-200 rounded-lg cursor-pointer hover:bg-slate-50 text-slate-600"
+                          className={`h-12 w-12 border-2 rounded-lg cursor-pointer ${theme === 'dark' ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
                           onClick={() => updateScore(game.id, 'A', -1)}
                         >
                           <Minus className="h-6 w-6" />
                         </Button>
-                        <div className="text-5xl font-mono font-bold w-20 text-center tabular-nums text-slate-900" style={{ fontFamily: 'Montserrat, sans-serif' }}>
+                        <div className={`text-5xl font-mono font-bold w-20 text-center tabular-nums ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`} style={{ fontFamily: 'Montserrat, sans-serif' }}>
                           {game.scoreA}
                         </div>
                         <Button 
                           variant="outline" 
                           size="icon" 
-                          className="h-12 w-12 border-2 border-slate-200 rounded-lg cursor-pointer hover:bg-slate-50 text-slate-600"
+                          className={`h-12 w-12 border-2 rounded-lg cursor-pointer ${theme === 'dark' ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
                           onClick={() => updateScore(game.id, 'A', 1)}
                         >
                           <Plus className="h-6 w-6" />
@@ -457,35 +507,49 @@ export default function TournamentPage() {
                       </div>
                     </div>
 
-                    <div className="h-px bg-slate-100 w-full" />
+                    <div className={`h-px w-full ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-100'}`} />
 
                     {/* Team B */}
                     <div className="flex items-center justify-between">
                       <div className="flex flex-col">
-                          <div className="text-xl md:text-2xl font-bold truncate max-w-[180px] text-slate-900">{getTeamName(game.teamBId)}</div>
+                          <div className={`text-xl md:text-2xl font-bold truncate max-w-[180px] ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{getTeamName(game.teamBId)}</div>
                           {game.sourceB && <div className="text-xs text-slate-500 font-medium">{game.sourceB}</div>}
                       </div>
                       <div className="flex items-center gap-3">
                         <Button 
                           variant="outline" 
                           size="icon" 
-                          className="h-12 w-12 border-2 border-slate-200 rounded-lg cursor-pointer hover:bg-slate-50 text-slate-600"
+                          className={`h-12 w-12 border-2 rounded-lg cursor-pointer ${theme === 'dark' ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
                           onClick={() => updateScore(game.id, 'B', -1)}
                         >
                           <Minus className="h-6 w-6" />
                         </Button>
-                        <div className="text-5xl font-mono font-bold w-20 text-center tabular-nums text-slate-900" style={{ fontFamily: 'Montserrat, sans-serif' }}>
+                        <div className={`text-5xl font-mono font-bold w-20 text-center tabular-nums ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`} style={{ fontFamily: 'Montserrat, sans-serif' }}>
                           {game.scoreB}
                         </div>
                         <Button 
                           variant="outline" 
                           size="icon" 
-                          className="h-12 w-12 border-2 border-slate-200 rounded-lg cursor-pointer hover:bg-slate-50 text-slate-600"
+                          className={`h-12 w-12 border-2 rounded-lg cursor-pointer ${theme === 'dark' ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
                           onClick={() => updateScore(game.id, 'B', 1)}
                         >
                           <Plus className="h-6 w-6" />
                         </Button>
                       </div>
+                    </div>
+                    
+                    {/* Up Next Display */}
+                    <div className={`mt-4 pt-4 border-t ${theme === 'dark' ? 'border-slate-700' : 'border-slate-100'}`}>
+                        <div className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">Up Next</div>
+                        {nextGame ? (
+                            <div className={`text-sm font-medium ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                                {getTeamName(nextGame.teamAId)} vs {getTeamName(nextGame.teamBId)}
+                            </div>
+                        ) : (
+                            <div className="text-sm font-medium text-slate-500 italic">
+                                No more games on this court
+                            </div>
+                        )}
                     </div>
                   </div>
                 ) : (
@@ -516,83 +580,139 @@ export default function TournamentPage() {
 
       <div className="grid lg:grid-cols-2 gap-8 mb-12">
         {/* Fixtures Table */}
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-[500px]">
-           <div className="bg-slate-900 p-4 border-b border-slate-200 relative overflow-hidden">
+        <div className={`rounded-xl border shadow-sm overflow-hidden flex flex-col h-[500px] ${theme === 'dark' ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+           <div className={`p-4 border-b relative overflow-hidden ${theme === 'dark' ? 'bg-slate-900 border-slate-700' : 'bg-slate-900 border-slate-200'}`}>
                <div className="absolute bottom-0 left-0 w-full h-1 bg-amber-500"></div>
                <h3 className="font-bold uppercase text-white tracking-wider">All Fixtures</h3>
            </div>
            <div className="flex-1 overflow-y-auto">
                <Table>
-                   <TableHeader className="bg-white sticky top-0 z-10 shadow-sm">
+                   <TableHeader className={`sticky top-0 z-10 shadow-sm ${theme === 'dark' ? 'bg-slate-800' : 'bg-white'}`}>
                        <TableRow className="border-b-2 border-amber-500">
-                           <TableHead className="w-16 font-bold text-slate-900">Rnd</TableHead>
-                           <TableHead className="w-40 font-bold text-slate-900">Match</TableHead>
-                           <TableHead className="text-right font-bold text-slate-900">Team A</TableHead>
-                           <TableHead className="text-center w-32 font-bold text-slate-900">Score</TableHead>
-                           <TableHead className="font-bold text-slate-900">Team B</TableHead>
+                           <TableHead className={`w-16 font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Rnd</TableHead>
+                           <TableHead className={`w-40 font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Match</TableHead>
+                           <TableHead className={`text-right font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Team A</TableHead>
+                           <TableHead className={`text-center w-40 font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Score</TableHead>
+                           <TableHead className={`font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Team B</TableHead>
                        </TableRow>
                    </TableHeader>
                    <TableBody>
                        {/* Group Stage Header */}
-                       <TableRow className="bg-slate-50 hover:bg-slate-50">
+                       <TableRow className={`${theme === 'dark' ? 'bg-slate-900 hover:bg-slate-900' : 'bg-slate-50 hover:bg-slate-50'}`}>
                            <TableCell colSpan={5} className="font-bold text-xs uppercase text-slate-500 py-2 text-center tracking-widest">Group Stage</TableCell>
                        </TableRow>
                        {games.filter(g => g.stage === 'group').map(game => (
-                           <TableRow key={game.id} className={game.roundNumber === currentRound ? "bg-amber-50" : ""}>
+                           <TableRow key={game.id} className={`${game.roundNumber === currentRound ? (theme === 'dark' ? 'bg-slate-700/50' : 'bg-amber-50') : ''} ${theme === 'dark' ? 'hover:bg-slate-700/30' : ''}`}>
                                <TableCell className="font-mono font-bold text-slate-500">{game.roundNumber}</TableCell>
                                <TableCell className="text-xs font-medium text-slate-500">
                                    {game.group ? `Group ${game.group}` : game.description}
                                </TableCell>
-                               <TableCell className="text-right font-medium text-slate-700">{getTeamName(game.teamAId)}</TableCell>
+                               <TableCell className={`text-right font-medium ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>{getTeamName(game.teamAId)}</TableCell>
                                <TableCell className="text-center">
                                    <div className="flex items-center justify-center gap-1">
+                                       <div className="flex flex-col gap-0.5">
+                                           <Button 
+                                              variant="ghost" size="icon" className="h-4 w-6 p-0 hover:bg-transparent text-slate-400 hover:text-amber-500"
+                                              onClick={() => updateScore(game.id, 'A', 1)}
+                                           >
+                                               <ArrowUp className="h-3 w-3" />
+                                           </Button>
+                                           <Button 
+                                              variant="ghost" size="icon" className="h-4 w-6 p-0 hover:bg-transparent text-slate-400 hover:text-red-500"
+                                              onClick={() => updateScore(game.id, 'A', -1)}
+                                           >
+                                               <ArrowDown className="h-3 w-3" />
+                                           </Button>
+                                       </div>
                                        <Input 
-                                           className="w-10 h-8 p-1 text-center font-mono font-bold text-slate-900 bg-white border-slate-200 focus:border-amber-500" 
+                                           className={`w-10 h-8 p-1 text-center font-mono font-bold focus:border-amber-500 ${theme === 'dark' ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'}`} 
                                            value={game.scoreA} 
                                            onChange={(e) => handleScoreEdit(game.id, 'A', e.target.value)}
                                        />
                                        <span className="text-slate-300">-</span>
                                        <Input 
-                                           className="w-10 h-8 p-1 text-center font-mono font-bold text-slate-900 bg-white border-slate-200 focus:border-amber-500" 
+                                           className={`w-10 h-8 p-1 text-center font-mono font-bold focus:border-amber-500 ${theme === 'dark' ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'}`} 
                                            value={game.scoreB} 
                                            onChange={(e) => handleScoreEdit(game.id, 'B', e.target.value)}
                                        />
+                                       <div className="flex flex-col gap-0.5">
+                                           <Button 
+                                              variant="ghost" size="icon" className="h-4 w-6 p-0 hover:bg-transparent text-slate-400 hover:text-amber-500"
+                                              onClick={() => updateScore(game.id, 'B', 1)}
+                                           >
+                                               <ArrowUp className="h-3 w-3" />
+                                           </Button>
+                                           <Button 
+                                              variant="ghost" size="icon" className="h-4 w-6 p-0 hover:bg-transparent text-slate-400 hover:text-red-500"
+                                              onClick={() => updateScore(game.id, 'B', -1)}
+                                           >
+                                               <ArrowDown className="h-3 w-3" />
+                                           </Button>
+                                       </div>
                                    </div>
                                </TableCell>
-                               <TableCell className="font-medium text-slate-700">{getTeamName(game.teamBId)}</TableCell>
+                               <TableCell className={`font-medium ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>{getTeamName(game.teamBId)}</TableCell>
                            </TableRow>
                        ))}
                        
                        {/* Finals Header */}
-                       <TableRow className="bg-slate-50 hover:bg-slate-50 border-t-2 border-slate-100">
+                       <TableRow className={`${theme === 'dark' ? 'bg-slate-900 hover:bg-slate-900 border-t-2 border-slate-700' : 'bg-slate-50 hover:bg-slate-50 border-t-2 border-slate-100'}`}>
                            <TableCell colSpan={5} className="font-bold text-xs uppercase text-slate-500 py-2 text-center tracking-widest">Finals & Placement</TableCell>
                        </TableRow>
                        {games.filter(g => g.stage !== 'group').map(game => (
-                           <TableRow key={game.id} className={game.roundNumber === currentRound ? "bg-amber-50" : ""}>
+                           <TableRow key={game.id} className={`${game.roundNumber === currentRound ? (theme === 'dark' ? 'bg-slate-700/50' : 'bg-amber-50') : ''} ${theme === 'dark' ? 'hover:bg-slate-700/30' : ''}`}>
                                <TableCell className="font-mono font-bold text-slate-500">{game.roundNumber}</TableCell>
                                <TableCell className="text-xs font-medium text-slate-500">
                                     <div className="truncate w-32" title={game.description}>{game.description}</div>
                                </TableCell>
-                               <TableCell className="text-right font-medium text-slate-700">
+                               <TableCell className={`text-right font-medium ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
                                    <div>{getTeamName(game.teamAId)}</div>
                                    {game.sourceA && <div className="text-[10px] text-slate-400">{game.sourceA}</div>}
                                </TableCell>
                                <TableCell className="text-center">
                                    <div className="flex items-center justify-center gap-1">
+                                       <div className="flex flex-col gap-0.5">
+                                           <Button 
+                                              variant="ghost" size="icon" className="h-4 w-6 p-0 hover:bg-transparent text-slate-400 hover:text-amber-500"
+                                              onClick={() => updateScore(game.id, 'A', 1)}
+                                           >
+                                               <ArrowUp className="h-3 w-3" />
+                                           </Button>
+                                           <Button 
+                                              variant="ghost" size="icon" className="h-4 w-6 p-0 hover:bg-transparent text-slate-400 hover:text-red-500"
+                                              onClick={() => updateScore(game.id, 'A', -1)}
+                                           >
+                                               <ArrowDown className="h-3 w-3" />
+                                           </Button>
+                                       </div>
                                        <Input 
-                                           className="w-10 h-8 p-1 text-center font-mono font-bold text-slate-900 bg-white border-slate-200 focus:border-amber-500" 
+                                           className={`w-10 h-8 p-1 text-center font-mono font-bold focus:border-amber-500 ${theme === 'dark' ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'}`} 
                                            value={game.scoreA} 
                                            onChange={(e) => handleScoreEdit(game.id, 'A', e.target.value)}
                                        />
                                        <span className="text-slate-300">-</span>
                                        <Input 
-                                           className="w-10 h-8 p-1 text-center font-mono font-bold text-slate-900 bg-white border-slate-200 focus:border-amber-500" 
+                                           className={`w-10 h-8 p-1 text-center font-mono font-bold focus:border-amber-500 ${theme === 'dark' ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-200 text-slate-900'}`} 
                                            value={game.scoreB} 
                                            onChange={(e) => handleScoreEdit(game.id, 'B', e.target.value)}
                                        />
+                                       <div className="flex flex-col gap-0.5">
+                                           <Button 
+                                              variant="ghost" size="icon" className="h-4 w-6 p-0 hover:bg-transparent text-slate-400 hover:text-amber-500"
+                                              onClick={() => updateScore(game.id, 'B', 1)}
+                                           >
+                                               <ArrowUp className="h-3 w-3" />
+                                           </Button>
+                                           <Button 
+                                              variant="ghost" size="icon" className="h-4 w-6 p-0 hover:bg-transparent text-slate-400 hover:text-red-500"
+                                              onClick={() => updateScore(game.id, 'B', -1)}
+                                           >
+                                               <ArrowDown className="h-3 w-3" />
+                                           </Button>
+                                       </div>
                                    </div>
                                </TableCell>
-                               <TableCell className="font-medium text-slate-700">
+                               <TableCell className={`font-medium ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
                                    <div>{getTeamName(game.teamBId)}</div>
                                    {game.sourceB && <div className="text-[10px] text-slate-400">{game.sourceB}</div>}
                                </TableCell>
@@ -609,41 +729,41 @@ export default function TournamentPage() {
                 If complete, show final placings 1-8. */}
             {currentRound < 10 ? (
                 <>
-                    <StandingsTable group="A" data={standingsA} />
-                    <StandingsTable group="B" data={standingsB} />
+                    <StandingsTable group="A" data={standingsA} theme={theme} />
+                    <StandingsTable group="B" data={standingsB} theme={theme} />
                 </>
             ) : finalResultsRevealed && (
-                <FinalStandingsTable placings={finalPlacings} />
+                <FinalStandingsTable placings={finalPlacings} theme={theme} />
             )}
             
             {/* Finals Rules Box */}
             {currentRound < 10 && (
-                <div className="bg-slate-50 border border-slate-200 rounded-xl p-6">
-                    <div className="flex items-center gap-2 mb-4 text-slate-700 font-bold uppercase text-sm tracking-wider">
+                <div className={`border rounded-xl p-6 ${theme === 'dark' ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'}`}>
+                    <div className="flex items-center gap-2 mb-4 text-slate-500 font-bold uppercase text-sm tracking-wider">
                         <Info className="h-4 w-4" /> Finals Format Rules
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2 text-sm text-slate-600">
-                        <div className="flex justify-between border-b border-slate-200 py-1">
+                    <div className={`grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2 text-sm ${theme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                        <div className={`flex justify-between border-b py-1 ${theme === 'dark' ? 'border-slate-700' : 'border-slate-200'}`}>
                             <span>SF1</span>
                             <span className="font-mono font-bold">1st Group A vs 2nd Group B</span>
                         </div>
-                        <div className="flex justify-between border-b border-slate-200 py-1">
+                        <div className={`flex justify-between border-b py-1 ${theme === 'dark' ? 'border-slate-700' : 'border-slate-200'}`}>
                             <span>SF2</span>
                             <span className="font-mono font-bold">1st Group B vs 2nd Group A</span>
                         </div>
-                        <div className="flex justify-between border-b border-slate-200 py-1">
+                        <div className={`flex justify-between border-b py-1 ${theme === 'dark' ? 'border-slate-700' : 'border-slate-200'}`}>
                             <span>5th/6th</span>
                             <span className="font-mono font-bold">3rd Group A vs 3rd Group B</span>
                         </div>
-                        <div className="flex justify-between border-b border-slate-200 py-1">
+                        <div className={`flex justify-between border-b py-1 ${theme === 'dark' ? 'border-slate-700' : 'border-slate-200'}`}>
                             <span>7th/8th</span>
                             <span className="font-mono font-bold">4th Group A vs 4th Group B</span>
                         </div>
-                        <div className="flex justify-between border-b border-slate-200 py-1">
+                        <div className={`flex justify-between border-b py-1 ${theme === 'dark' ? 'border-slate-700' : 'border-slate-200'}`}>
                             <span>3rd/4th</span>
                             <span className="font-mono font-bold">Loser SF1 vs Loser SF2</span>
                         </div>
-                        <div className="flex justify-between border-b border-slate-200 py-1">
+                        <div className={`flex justify-between border-b py-1 ${theme === 'dark' ? 'border-slate-700' : 'border-slate-200'}`}>
                             <span>Final</span>
                             <span className="font-mono font-bold">Winner SF1 vs Winner SF2</span>
                         </div>
@@ -654,7 +774,7 @@ export default function TournamentPage() {
       </div>
 
       <div className="mt-16 text-center">
-          <Button variant="ghost" onClick={resetTournament} className="text-red-500 hover:text-red-700 hover:bg-red-50 cursor-pointer">
+          <Button variant="ghost" onClick={resetTournament} className="text-red-500 hover:text-red-700 hover:bg-red-50/10 cursor-pointer">
               Reset Tournament
           </Button>
       </div>
@@ -662,10 +782,10 @@ export default function TournamentPage() {
   );
 }
 
-function StandingsTable({ group, data }: { group: string, data: Standing[] }) {
+function StandingsTable({ group, data, theme }: { group: string, data: Standing[], theme: string }) {
     return (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-700">
-            <div className="bg-slate-900 p-4 border-b border-slate-200 flex justify-between items-center relative overflow-hidden">
+        <div className={`rounded-xl border shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-700 ${theme === 'dark' ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+            <div className="bg-slate-900 p-4 border-b border-slate-800 flex justify-between items-center relative overflow-hidden">
                <div className="absolute bottom-0 left-0 w-full h-1 bg-amber-500"></div>
                <h3 className="font-bold uppercase text-white tracking-wider">Group {group} Standings</h3>
                <Trophy className="h-4 w-4 text-amber-500" />
@@ -673,27 +793,27 @@ function StandingsTable({ group, data }: { group: string, data: Standing[] }) {
            <Table>
                <TableHeader>
                    <TableRow className="border-b-2 border-amber-500">
-                       <TableHead className="w-10 font-bold text-slate-900">Pos</TableHead>
-                       <TableHead className="font-bold text-slate-900">Team</TableHead>
-                       <TableHead className="text-center font-bold text-slate-900">P</TableHead>
-                       <TableHead className="text-center font-bold text-slate-900">W</TableHead>
-                       <TableHead className="text-center font-bold text-slate-900">D</TableHead>
-                       <TableHead className="text-center font-bold text-slate-900">L</TableHead>
-                       <TableHead className="text-center hidden sm:table-cell font-bold text-slate-900">GD</TableHead>
-                       <TableHead className="text-center font-bold text-slate-900">Pts</TableHead>
+                       <TableHead className={`w-10 font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Pos</TableHead>
+                       <TableHead className={`font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Team</TableHead>
+                       <TableHead className={`text-center font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>P</TableHead>
+                       <TableHead className={`text-center font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>W</TableHead>
+                       <TableHead className={`text-center font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>D</TableHead>
+                       <TableHead className={`text-center font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>L</TableHead>
+                       <TableHead className={`text-center hidden sm:table-cell font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>GD</TableHead>
+                       <TableHead className={`text-center font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Pts</TableHead>
                    </TableRow>
                </TableHeader>
                <TableBody>
                    {data.map((row, index) => (
-                       <TableRow key={row.teamId} className="hover:bg-slate-50">
-                           <TableCell className="font-mono text-slate-400">{index + 1}</TableCell>
-                           <TableCell className="font-bold text-slate-900">{row.teamName}</TableCell>
+                       <TableRow key={row.teamId} className={`${theme === 'dark' ? 'hover:bg-slate-700/50' : 'hover:bg-slate-50'}`}>
+                           <TableCell className="font-mono text-slate-500">{index + 1}</TableCell>
+                           <TableCell className={`font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{row.teamName}</TableCell>
                            <TableCell className="text-center text-slate-500">{row.played}</TableCell>
-                           <TableCell className="text-center font-medium">{row.won}</TableCell>
-                           <TableCell className="text-center text-slate-400">{row.drawn}</TableCell>
+                           <TableCell className={`text-center font-medium ${theme === 'dark' ? 'text-slate-300' : ''}`}>{row.won}</TableCell>
+                           <TableCell className="text-center text-slate-500">{row.drawn}</TableCell>
                            <TableCell className="text-center text-red-500 font-medium">{row.lost}</TableCell>
-                           <TableCell className="text-center hidden sm:table-cell font-mono text-slate-600">{row.gd > 0 ? `+${row.gd}` : row.gd}</TableCell>
-                           <TableCell className="text-center font-bold text-lg text-slate-900">{row.points}</TableCell>
+                           <TableCell className="text-center hidden sm:table-cell font-mono text-slate-500">{row.gd > 0 ? `+${row.gd}` : row.gd}</TableCell>
+                           <TableCell className={`text-center font-bold text-lg ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{row.points}</TableCell>
                        </TableRow>
                    ))}
                </TableBody>
@@ -702,35 +822,35 @@ function StandingsTable({ group, data }: { group: string, data: Standing[] }) {
     )
 }
 
-function FinalStandingsTable({ placings }: { placings: FinalPlacing[] }) {
+function FinalStandingsTable({ placings, theme }: { placings: FinalPlacing[], theme: string }) {
     return (
-        <div className="bg-white rounded-xl border-2 border-amber-400 shadow-[0_0_30px_-15px_rgba(245,158,11,0.3)] overflow-hidden animate-in fade-in slide-in-from-bottom-8 duration-1000">
+        <div className={`rounded-xl border-2 border-amber-400 shadow-[0_0_30px_-15px_rgba(245,158,11,0.3)] overflow-hidden animate-in fade-in slide-in-from-bottom-8 duration-1000 ${theme === 'dark' ? 'bg-slate-800' : 'bg-white'}`}>
             <div className="bg-amber-400 p-6 border-b border-amber-500 flex justify-between items-center">
                <h3 className="text-2xl font-bold uppercase text-slate-900 tracking-tight">Final Tournament Standings</h3>
                <Medal className="h-8 w-8 text-slate-900" />
            </div>
            <Table>
                <TableHeader>
-                   <TableRow className="bg-amber-50 hover:bg-amber-50 border-b border-amber-200">
-                       <TableHead className="w-16 font-bold text-slate-900">Pos</TableHead>
-                       <TableHead className="font-bold text-slate-900">Team</TableHead>
-                       <TableHead className="font-bold text-slate-900">Group Pos</TableHead>
-                       <TableHead className="font-bold text-slate-900">Group Stats</TableHead>
-                       <TableHead className="font-bold text-slate-900">Path</TableHead>
+                   <TableRow className={`border-b border-amber-200 ${theme === 'dark' ? 'bg-amber-500/20 hover:bg-amber-500/20' : 'bg-amber-50 hover:bg-amber-50'}`}>
+                       <TableHead className={`w-16 font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Pos</TableHead>
+                       <TableHead className={`font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Team</TableHead>
+                       <TableHead className={`font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Group Pos</TableHead>
+                       <TableHead className={`font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Group Stats</TableHead>
+                       <TableHead className={`font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Path</TableHead>
                    </TableRow>
                </TableHeader>
                <TableBody>
                    {placings.map((row) => (
-                       <TableRow key={row.teamId} className="hover:bg-amber-50/50">
-                           <TableCell className="font-display font-bold text-2xl text-slate-900">{row.position}</TableCell>
-                           <TableCell className="font-bold text-lg text-slate-900">{row.teamName}</TableCell>
-                           <TableCell className="text-slate-700 font-semibold">
+                       <TableRow key={row.teamId} className={`${theme === 'dark' ? 'hover:bg-slate-700/50' : 'hover:bg-amber-50/50'}`}>
+                           <TableCell className={`font-display font-bold text-2xl ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{row.position}</TableCell>
+                           <TableCell className={`font-bold text-lg ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{row.teamName}</TableCell>
+                           <TableCell className={`${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'} font-semibold`}>
                                 {row.groupRank}{row.groupRank === 1 ? 'st' : row.groupRank === 2 ? 'nd' : row.groupRank === 3 ? 'rd' : 'th'} in Group {row.group}
                            </TableCell>
-                           <TableCell className="text-slate-600 font-mono text-sm">
+                           <TableCell className="text-slate-500 font-mono text-sm">
                                 {row.groupPoints} pts, {row.groupGD > 0 ? '+' : ''}{row.groupGD} GD
                            </TableCell>
-                           <TableCell className="text-slate-600 italic">{row.path}</TableCell>
+                           <TableCell className="text-slate-500 italic">{row.path}</TableCell>
                        </TableRow>
                    ))}
                </TableBody>
