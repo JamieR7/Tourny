@@ -931,7 +931,7 @@ export default function TournamentPage() {
       {!isSetupMode && (
           <>
             {/* Courts Row */}
-            <div className={`grid gap-4 mb-8 ${courtCount === 1 ? 'grid-cols-1' : courtCount === 2 ? 'md:grid-cols-2' : courtCount === 3 ? 'md:grid-cols-3' : 'md:grid-cols-2 lg:grid-cols-4'}`}>
+            <div className={`grid gap-4 mb-8 ${courtCount === 1 ? 'grid-cols-1 max-w-2xl mx-auto' : courtCount === 2 ? 'md:grid-cols-2' : courtCount === 3 ? 'md:grid-cols-3' : 'md:grid-cols-2 xl:grid-cols-4'}`}>
               {COURTS.slice(0, courtCount).map(court => {
                 const game = activeGames.find(g => g.courtId === court.id);
                 const nextGame = getUpNext(court.id);
@@ -958,30 +958,30 @@ export default function TournamentPage() {
                       {game ? (
                         <div className="flex flex-col gap-4">
                           {/* Team A */}
-                          <div className="flex items-center justify-between">
-                            <div className="flex flex-col">
-                                <div className={`text-3xl md:text-4xl font-extrabold truncate max-w-[200px] leading-tight ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{getTeamName(game.teamAId)}</div>
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex flex-col flex-1 min-w-0">
+                                <div className={`text-2xl md:text-3xl font-extrabold truncate leading-tight ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{getTeamName(game.teamAId)}</div>
                                 {game.sourceA && <div className="text-xs text-slate-500 font-medium">{game.sourceA}</div>}
                             </div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1 flex-shrink-0">
                               <Button 
                                 variant="outline" 
                                 size="icon" 
-                                className={`h-10 w-10 border-2 rounded-lg cursor-pointer ${theme === 'dark' ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                                className={`h-9 w-9 border-2 rounded-lg cursor-pointer ${theme === 'dark' ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
                                 onClick={() => updateScore(game.id, 'A', -1)}
                               >
-                                <Minus className="h-5 w-5" />
+                                <Minus className="h-4 w-4" />
                               </Button>
-                              <div className={`text-6xl font-mono font-bold w-24 text-center tabular-nums leading-none ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`} style={{ fontFamily: 'Montserrat, sans-serif' }}>
+                              <div className={`text-4xl md:text-5xl font-mono font-bold w-16 md:w-20 text-center tabular-nums leading-none ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`} style={{ fontFamily: 'Montserrat, sans-serif' }}>
                                 {game.scoreA}
                               </div>
                               <Button 
                                 variant="outline" 
                                 size="icon" 
-                                className={`h-10 w-10 border-2 rounded-lg cursor-pointer ${theme === 'dark' ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                                className={`h-9 w-9 border-2 rounded-lg cursor-pointer ${theme === 'dark' ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
                                 onClick={() => updateScore(game.id, 'A', 1)}
                               >
-                                <Plus className="h-5 w-5" />
+                                <Plus className="h-4 w-4" />
                               </Button>
                             </div>
                           </div>
@@ -989,30 +989,30 @@ export default function TournamentPage() {
                           <div className={`h-px w-full ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-100'}`} />
 
                           {/* Team B */}
-                          <div className="flex items-center justify-between">
-                            <div className="flex flex-col">
-                                <div className={`text-3xl md:text-4xl font-extrabold truncate max-w-[200px] leading-tight ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{getTeamName(game.teamBId)}</div>
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex flex-col flex-1 min-w-0">
+                                <div className={`text-2xl md:text-3xl font-extrabold truncate leading-tight ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{getTeamName(game.teamBId)}</div>
                                 {game.sourceB && <div className="text-xs text-slate-500 font-medium">{game.sourceB}</div>}
                             </div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1 flex-shrink-0">
                               <Button 
                                 variant="outline" 
                                 size="icon" 
-                                className={`h-10 w-10 border-2 rounded-lg cursor-pointer ${theme === 'dark' ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                                className={`h-9 w-9 border-2 rounded-lg cursor-pointer ${theme === 'dark' ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
                                 onClick={() => updateScore(game.id, 'B', -1)}
                               >
-                                <Minus className="h-5 w-5" />
+                                <Minus className="h-4 w-4" />
                               </Button>
-                              <div className={`text-6xl font-mono font-bold w-24 text-center tabular-nums leading-none ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`} style={{ fontFamily: 'Montserrat, sans-serif' }}>
+                              <div className={`text-4xl md:text-5xl font-mono font-bold w-16 md:w-20 text-center tabular-nums leading-none ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`} style={{ fontFamily: 'Montserrat, sans-serif' }}>
                                 {game.scoreB}
                               </div>
                               <Button 
                                 variant="outline" 
                                 size="icon" 
-                                className={`h-10 w-10 border-2 rounded-lg cursor-pointer ${theme === 'dark' ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                                className={`h-9 w-9 border-2 rounded-lg cursor-pointer ${theme === 'dark' ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
                                 onClick={() => updateScore(game.id, 'B', 1)}
                               >
-                                <Plus className="h-5 w-5" />
+                                <Plus className="h-4 w-4" />
                               </Button>
                             </div>
                           </div>
