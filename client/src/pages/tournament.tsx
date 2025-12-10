@@ -9,6 +9,8 @@ import {
   calculateFinalPlacings,
   generateRoundRobinSchedule,
   generateGroupStageSchedule,
+  getGroupStageRounds,
+  getFinalsRoundCount,
   type Game, 
   type Team,
   type Standing,
@@ -302,10 +304,7 @@ export default function TournamentPage() {
   // Calculate max rounds based on format, team count, and court count
   const getMaxRounds = () => {
       if (tournamentFormat === 'groups') {
-          const groupGamesPerGroup = 6;
-          const totalGroupGames = groupGamesPerGroup * 2;
-          const groupRounds = Math.ceil(totalGroupGames / courtCount);
-          return groupRounds + 3;
+          return getGroupStageRounds(courtCount) + getFinalsRoundCount(courtCount);
       }
       const totalGames = (teamCount * (teamCount - 1)) / 2;
       const maxGamesPerRound = Math.min(courtCount, Math.floor(teamCount / 2));
@@ -325,17 +324,21 @@ export default function TournamentPage() {
     const r = currentRoundRef.current; // Use ref
 
     if (tournamentFormat === 'groups') {
-        if (r === 6) {
+        const groupRounds = getGroupStageRounds(courtCount);
+        const semiRound = groupRounds + 1;
+        
+        if (r === groupRounds) {
           const standingsA = calculateStandings(updatedGames, teams.filter(t => t.group === 'A'));
           const standingsB = calculateStandings(updatedGames, teams.filter(t => t.group === 'B'));
           const lastId = Math.max(...updatedGames.map(g => g.id));
-          const newFixtures = generateFinalsFixtures(standingsA, standingsB, lastId);
+          const newFixtures = generateFinalsFixtures(standingsA, standingsB, lastId, semiRound, courtCount);
           finalGames = [...updatedGames, ...newFixtures];
         }
 
-        if (r === 7) {
-            const sf1 = finalGames.find(g => g.roundNumber === 7 && g.courtId === 1);
-            const sf2 = finalGames.find(g => g.roundNumber === 7 && g.courtId === 2);
+        if (courtCount >= 2 && r === semiRound) {
+            const sf1 = finalGames.find(g => g.roundNumber === semiRound && g.courtId === 1 && g.stage === 'semi');
+            const sf2 = finalGames.find(g => g.roundNumber === semiRound && g.courtId === 2 && g.stage === 'semi');
+            const finalsRound = semiRound + 2;
             
             if (sf1 && sf2) {
                  const winner1 = sf1.scoreA > sf1.scoreB ? sf1.teamAId : sf1.teamBId;
@@ -344,7 +347,7 @@ export default function TournamentPage() {
                  const loser2 = sf2.scoreA > sf2.scoreB ? sf2.teamBId : sf2.teamAId;
 
                  finalGames = finalGames.map(g => {
-                     if (g.roundNumber === 9) {
+                     if (g.roundNumber === finalsRound) {
                          if (g.stage === 'final') {
                              return { ...g, teamAId: winner1, teamBId: winner2 };
                          } else if (g.stage === 'placing') {
@@ -353,6 +356,36 @@ export default function TournamentPage() {
                      }
                      return g;
                  });
+            }
+        }
+        
+        const sf1 = finalGames.find(g => g.stage === 'semi' && g.description.includes('Semi-final 1'));
+        const sf2 = finalGames.find(g => g.stage === 'semi' && g.description.includes('Semi-final 2'));
+        const finalGame = finalGames.find(g => g.stage === 'final');
+        const thirdPlaceGame = finalGames.find(g => g.description.includes('3rd/4th'));
+        
+        if (sf1 && sf2 && sf1.status === 'finished' && sf2.status === 'finished') {
+            const winner1 = sf1.scoreA > sf1.scoreB ? sf1.teamAId : sf1.teamBId;
+            const loser1 = sf1.scoreA > sf1.scoreB ? sf1.teamBId : sf1.teamAId;
+            const winner2 = sf2.scoreA > sf2.scoreB ? sf2.teamAId : sf2.teamBId;
+            const loser2 = sf2.scoreA > sf2.scoreB ? sf2.teamBId : sf2.teamAId;
+
+            if (finalGame && finalGame.teamAId === null) {
+                finalGames = finalGames.map(g => {
+                    if (g.stage === 'final') {
+                        return { ...g, teamAId: winner1, teamBId: winner2 };
+                    }
+                    return g;
+                });
+            }
+            
+            if (thirdPlaceGame && thirdPlaceGame.teamAId === null) {
+                finalGames = finalGames.map(g => {
+                    if (g.description.includes('3rd/4th')) {
+                        return { ...g, teamAId: loser1, teamBId: loser2 };
+                    }
+                    return g;
+                });
             }
         }
     }
@@ -898,8 +931,8 @@ export default function TournamentPage() {
       {!isSetupMode && (
           <>
             {/* Courts Row */}
-            <div className="grid md:grid-cols-2 gap-4 mb-8">
-              {COURTS.map(court => {
+            <div className={`grid gap-4 mb-8 ${courtCount === 1 ? 'grid-cols-1' : courtCount === 2 ? 'md:grid-cols-2' : courtCount === 3 ? 'md:grid-cols-3' : 'md:grid-cols-2 lg:grid-cols-4'}`}>
+              {COURTS.slice(0, courtCount).map(court => {
                 const game = activeGames.find(g => g.courtId === court.id);
                 const nextGame = getUpNext(court.id);
                 

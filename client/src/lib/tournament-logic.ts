@@ -295,112 +295,103 @@ export function calculateStandings(games: Game[], teams: Team[]): Standing[] {
   });
 }
 
-export function generateFinalsFixtures(standingsA: Standing[], standingsB: Standing[], lastGameId: number): Game[] {
-  // standingsA and standingsB should be sorted 1st to 4th already
-  
+export function generateFinalsFixtures(
+  standingsA: Standing[], 
+  standingsB: Standing[], 
+  lastGameId: number,
+  startRound: number = 7,
+  courtCount: number = 2
+): Game[] {
   const games: Game[] = [];
   let nextId = lastGameId + 1;
+  let currentRound = startRound;
 
-  // R7: Semis
-  // SF1: 1st A vs 2nd B (Court 1)
-  games.push({
-    id: nextId++,
-    roundNumber: 7,
-    courtId: 1,
-    stage: 'semi',
-    teamAId: standingsA[0].teamId,
-    teamBId: standingsB[1].teamId,
-    scoreA: 0,
-    scoreB: 0,
-    status: 'scheduled',
-    description: 'Semi-final 1 (1st A vs 2nd B)',
-    sourceA: '1st Group A',
-    sourceB: '2nd Group B'
-  });
+  if (courtCount >= 2) {
+    games.push({
+      id: nextId++, roundNumber: currentRound, courtId: 1, stage: 'semi',
+      teamAId: standingsA[0].teamId, teamBId: standingsB[1].teamId,
+      scoreA: 0, scoreB: 0, status: 'scheduled',
+      description: 'Semi-final 1 (1st A vs 2nd B)', sourceA: '1st Group A', sourceB: '2nd Group B'
+    });
+    games.push({
+      id: nextId++, roundNumber: currentRound, courtId: 2, stage: 'semi',
+      teamAId: standingsB[0].teamId, teamBId: standingsA[1].teamId,
+      scoreA: 0, scoreB: 0, status: 'scheduled',
+      description: 'Semi-final 2 (1st B vs 2nd A)', sourceA: '1st Group B', sourceB: '2nd Group A'
+    });
+    currentRound++;
+    
+    games.push({
+      id: nextId++, roundNumber: currentRound, courtId: 1, stage: 'placing',
+      teamAId: standingsA[2].teamId, teamBId: standingsB[2].teamId,
+      scoreA: 0, scoreB: 0, status: 'scheduled',
+      description: '5th/6th Playoff (3rd A vs 3rd B)', sourceA: '3rd Group A', sourceB: '3rd Group B'
+    });
+    games.push({
+      id: nextId++, roundNumber: currentRound, courtId: 2, stage: 'placing',
+      teamAId: standingsA[3].teamId, teamBId: standingsB[3].teamId,
+      scoreA: 0, scoreB: 0, status: 'scheduled',
+      description: '7th/8th Playoff (4th A vs 4th B)', sourceA: '4th Group A', sourceB: '4th Group B'
+    });
+    currentRound++;
 
-  // SF2: 1st B vs 2nd A (Court 2)
-  games.push({
-    id: nextId++,
-    roundNumber: 7,
-    courtId: 2,
-    stage: 'semi',
-    teamAId: standingsB[0].teamId,
-    teamBId: standingsA[1].teamId,
-    scoreA: 0,
-    scoreB: 0,
-    status: 'scheduled',
-    description: 'Semi-final 2 (1st B vs 2nd A)',
-    sourceA: '1st Group B',
-    sourceB: '2nd Group A'
-  });
-
-  // R8: Placing Games (5th-8th)
-  // 5th/6th: 3rd A vs 3rd B (Court 1)
-  games.push({
-    id: nextId++,
-    roundNumber: 8,
-    courtId: 1,
-    stage: 'placing',
-    teamAId: standingsA[2].teamId,
-    teamBId: standingsB[2].teamId,
-    scoreA: 0,
-    scoreB: 0,
-    status: 'scheduled',
-    description: '5th/6th Playoff (3rd A vs 3rd B)',
-    sourceA: '3rd Group A',
-    sourceB: '3rd Group B'
-  });
-
-  // 7th/8th: 4th A vs 4th B (Court 2)
-  games.push({
-    id: nextId++,
-    roundNumber: 8,
-    courtId: 2,
-    stage: 'placing',
-    teamAId: standingsA[3].teamId,
-    teamBId: standingsB[3].teamId,
-    scoreA: 0,
-    scoreB: 0,
-    status: 'scheduled',
-    description: '7th/8th Playoff (4th A vs 4th B)',
-    sourceA: '4th Group A',
-    sourceB: '4th Group B'
-  });
-
-  // R9: Finals & 3rd Place
-  // Final: Winner SF1 vs Winner SF2 (Court 1) - placeholders for now, needs dynamic update
-  games.push({
-    id: nextId++,
-    roundNumber: 9,
-    courtId: 1,
-    stage: 'final',
-    teamAId: null, // To be filled after R7
-    teamBId: null,
-    scoreA: 0,
-    scoreB: 0,
-    status: 'scheduled',
-    description: 'Grand Final (Winner SF1 vs Winner SF2)',
-    sourceA: 'Winner SF1',
-    sourceB: 'Winner SF2'
-  });
-
-  // 3rd Place: Loser SF1 vs Loser SF2 (Court 2)
-  games.push({
-    id: nextId++,
-    roundNumber: 9,
-    courtId: 2,
-    stage: 'placing',
-    teamAId: null, // To be filled after R7
-    teamBId: null,
-    scoreA: 0,
-    scoreB: 0,
-    status: 'scheduled',
-    description: '3rd/4th Playoff (Loser SF1 vs Loser SF2)',
-    sourceA: 'Loser SF1',
-    sourceB: 'Loser SF2'
-  });
+    games.push({
+      id: nextId++, roundNumber: currentRound, courtId: 1, stage: 'final',
+      teamAId: null, teamBId: null, scoreA: 0, scoreB: 0, status: 'scheduled',
+      description: 'Grand Final (Winner SF1 vs Winner SF2)', sourceA: 'Winner SF1', sourceB: 'Winner SF2'
+    });
+    games.push({
+      id: nextId++, roundNumber: currentRound, courtId: 2, stage: 'placing',
+      teamAId: null, teamBId: null, scoreA: 0, scoreB: 0, status: 'scheduled',
+      description: '3rd/4th Playoff (Loser SF1 vs Loser SF2)', sourceA: 'Loser SF1', sourceB: 'Loser SF2'
+    });
+  } else {
+    games.push({
+      id: nextId++, roundNumber: currentRound++, courtId: 1, stage: 'semi',
+      teamAId: standingsA[0].teamId, teamBId: standingsB[1].teamId,
+      scoreA: 0, scoreB: 0, status: 'scheduled',
+      description: 'Semi-final 1 (1st A vs 2nd B)', sourceA: '1st Group A', sourceB: '2nd Group B'
+    });
+    games.push({
+      id: nextId++, roundNumber: currentRound++, courtId: 1, stage: 'semi',
+      teamAId: standingsB[0].teamId, teamBId: standingsA[1].teamId,
+      scoreA: 0, scoreB: 0, status: 'scheduled',
+      description: 'Semi-final 2 (1st B vs 2nd A)', sourceA: '1st Group B', sourceB: '2nd Group A'
+    });
+    games.push({
+      id: nextId++, roundNumber: currentRound++, courtId: 1, stage: 'placing',
+      teamAId: standingsA[2].teamId, teamBId: standingsB[2].teamId,
+      scoreA: 0, scoreB: 0, status: 'scheduled',
+      description: '5th/6th Playoff (3rd A vs 3rd B)', sourceA: '3rd Group A', sourceB: '3rd Group B'
+    });
+    games.push({
+      id: nextId++, roundNumber: currentRound++, courtId: 1, stage: 'placing',
+      teamAId: standingsA[3].teamId, teamBId: standingsB[3].teamId,
+      scoreA: 0, scoreB: 0, status: 'scheduled',
+      description: '7th/8th Playoff (4th A vs 4th B)', sourceA: '4th Group A', sourceB: '4th Group B'
+    });
+    games.push({
+      id: nextId++, roundNumber: currentRound++, courtId: 1, stage: 'placing',
+      teamAId: null, teamBId: null, scoreA: 0, scoreB: 0, status: 'scheduled',
+      description: '3rd/4th Playoff (Loser SF1 vs Loser SF2)', sourceA: 'Loser SF1', sourceB: 'Loser SF2'
+    });
+    games.push({
+      id: nextId++, roundNumber: currentRound++, courtId: 1, stage: 'final',
+      teamAId: null, teamBId: null, scoreA: 0, scoreB: 0, status: 'scheduled',
+      description: 'Grand Final (Winner SF1 vs Winner SF2)', sourceA: 'Winner SF1', sourceB: 'Winner SF2'
+    });
+  }
 
   return games;
+}
+
+export function getGroupStageRounds(courtCount: number): number {
+  const totalGroupGames = 12;
+  return Math.ceil(totalGroupGames / courtCount);
+}
+
+export function getFinalsRoundCount(courtCount: number): number {
+  return courtCount >= 2 ? 3 : 6;
 }
 
 export function calculateFinalPlacings(games: Game[], teams: Team[]): FinalPlacing[] {
@@ -429,8 +420,8 @@ export function calculateFinalPlacings(games: Game[], teams: Team[]): FinalPlaci
     return { winner: game.teamAId, loser: game.teamBId };
   };
 
-  // 1st & 2nd: Grand Final (Round 9, Stage 'final')
-  const grandFinal = games.find(g => g.stage === 'final' && g.roundNumber === 9);
+  // 1st & 2nd: Grand Final (by stage 'final')
+  const grandFinal = games.find(g => g.stage === 'final');
   if (grandFinal && grandFinal.teamAId && grandFinal.teamBId) {
     const { winner, loser } = getResult(grandFinal);
     if (winner && teamMap.has(winner)) {
