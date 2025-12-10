@@ -8,6 +8,7 @@ import {
   generateFinalsFixtures,
   calculateFinalPlacings,
   generateRoundRobinSchedule,
+  generateGroupStageSchedule,
   type Game, 
   type Team,
   type Standing,
@@ -32,7 +33,8 @@ export default function TournamentPage() {
   const [tournamentFormat, setTournamentFormat] = useState<TournamentFormat>('groups');
   const [teamCount, setTeamCount] = useState<number>(8);
   const [teamNames, setTeamNames] = useState<Record<number, string>>({});
-  const [courtNames, setCourtNames] = useState<Record<number, string>>({ 1: 'Court 1', 2: 'Court 2' });
+  const [courtCount, setCourtCount] = useState<number>(2);
+  const [courtNames, setCourtNames] = useState<Record<number, string>>({ 1: 'Court 1', 2: 'Court 2', 3: 'Court 3', 4: 'Court 4' });
 
   // Time Setup
   const [startMode, setStartMode] = useState<'now' | 'custom'>('now');
@@ -297,13 +299,17 @@ export default function TournamentPage() {
     setShowNextRoundModal(true);
   };
   
-  // Calculate max rounds based on format and team count
+  // Calculate max rounds based on format, team count, and court count
   const getMaxRounds = () => {
-      if (tournamentFormat === 'groups') return 9;
-      if (teamCount === 4) return 3;
-      if (teamCount === 6) return 8; // approx 7.5 -> 8 rounds
-      if (teamCount === 8) return 14;
-      return 14;
+      if (tournamentFormat === 'groups') {
+          const groupGamesPerGroup = 6;
+          const totalGroupGames = groupGamesPerGroup * 2;
+          const groupRounds = Math.ceil(totalGroupGames / courtCount);
+          return groupRounds + 3;
+      }
+      const totalGames = (teamCount * (teamCount - 1)) / 2;
+      const maxGamesPerRound = Math.min(courtCount, Math.floor(teamCount / 2));
+      return Math.ceil(totalGames / maxGamesPerRound);
   };
 
   // Actual logic to advance round
@@ -398,9 +404,9 @@ export default function TournamentPage() {
 
       // Generate Schedule
       if (tournamentFormat === 'groups') {
-          setGames(INITIAL_GAMES);
+          setGames(generateGroupStageSchedule(courtCount));
       } else {
-          setGames(generateRoundRobinSchedule(teamCount));
+          setGames(generateRoundRobinSchedule(teamCount, courtCount));
       }
       
       setCurrentRound(1);
@@ -485,7 +491,8 @@ export default function TournamentPage() {
       pauseStartRef.current = null;
       setTeamCount(8); // Reset to default
       setTournamentFormat('groups'); // Reset to default
-      setCourtNames({ 1: 'Court 1', 2: 'Court 2' }); // Reset court names
+      setCourtCount(2); // Reset court count
+      setCourtNames({ 1: 'Court 1', 2: 'Court 2', 3: 'Court 3', 4: 'Court 4' }); // Reset court names
       setShowResetModal(false);
   };
 
@@ -790,9 +797,27 @@ export default function TournamentPage() {
                      </div>
 
                      <div className="space-y-4">
+                         <Label className={`text-lg font-semibold ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>Number of Courts</Label>
+                         <div className="flex gap-2">
+                             {[1, 2, 3, 4].map(count => (
+                                 <Button
+                                     key={count}
+                                     type="button"
+                                     variant={courtCount === count ? "default" : "outline"}
+                                     className={`flex-1 font-bold ${courtCount === count ? 'bg-amber-500 hover:bg-amber-600 text-slate-900' : (theme === 'dark' ? 'border-slate-600 text-slate-300' : '')}`}
+                                     onClick={() => setCourtCount(count)}
+                                     data-testid={`button-court-count-${count}`}
+                                 >
+                                     {count}
+                                 </Button>
+                             ))}
+                         </div>
+                     </div>
+
+                     <div className="space-y-4">
                          <Label className={`text-lg font-semibold ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>Court Names</Label>
                          <div className="grid grid-cols-1 gap-2">
-                             {[1, 2].map(id => (
+                             {Array.from({ length: courtCount }, (_, i) => i + 1).map(id => (
                                  <div key={id} className="flex items-center gap-2">
                                      <span className={`text-sm font-mono font-bold w-8 ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>{id}.</span>
                                      <Input 
