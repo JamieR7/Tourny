@@ -931,13 +931,14 @@ export default function TournamentPage() {
       {!isSetupMode && (
           <>
             {/* Courts Row */}
-            <div className={`grid gap-4 mb-8 ${courtCount === 1 ? 'grid-cols-1 max-w-2xl mx-auto' : courtCount === 2 ? 'md:grid-cols-2' : courtCount === 3 ? 'md:grid-cols-3' : 'md:grid-cols-2 xl:grid-cols-4'}`}>
+            <div className={`grid gap-4 mb-8 ${courtCount === 1 ? 'grid-cols-1 max-w-xl mx-auto' : courtCount === 2 ? 'md:grid-cols-2' : 'md:grid-cols-2'}`}>
               {COURTS.slice(0, courtCount).map(court => {
                 const game = activeGames.find(g => g.courtId === court.id);
                 const nextGame = getUpNext(court.id);
                 
+                const isLastOfThree = courtCount === 3 && court.id === 3;
                 return (
-                  <Card key={court.id} className={`border-0 shadow-lg rounded-xl overflow-hidden relative ${theme === 'dark' ? 'bg-slate-800' : 'bg-white'}`}>
+                  <Card key={court.id} className={`border-0 shadow-lg rounded-xl overflow-hidden relative ${theme === 'dark' ? 'bg-slate-800' : 'bg-white'} ${isLastOfThree ? 'md:col-span-2 md:max-w-[50%] md:mx-auto' : ''}`}>
                     <CardHeader className="bg-slate-900 text-white py-3 px-4 relative overflow-hidden">
                       <div className="absolute bottom-0 left-0 w-full h-1 bg-amber-500"></div>
                       <div className="flex flex-row justify-between items-center relative z-10">
