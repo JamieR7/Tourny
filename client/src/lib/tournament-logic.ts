@@ -114,45 +114,84 @@ export function generateRoundRobinSchedule(numberOfTeams: number, courtCount: nu
     const games: Game[] = [];
     let gameId = 1;
 
+    const n = numberOfTeams % 2 === 0 ? numberOfTeams : numberOfTeams + 1;
+    const teams = Array.from({length: n}, (_, i) => i + 1);
+    const totalRounds = n - 1;
+    const gamesPerRound = Math.floor(n / 2);
+
     const allPairings: {a: number, b: number}[] = [];
-    for (let i = 1; i <= numberOfTeams; i++) {
-        for (let j = i + 1; j <= numberOfTeams; j++) {
-            allPairings.push({a: i, b: j});
+    
+    for (let round = 0; round < totalRounds; round++) {
+        for (let i = 0; i < gamesPerRound; i++) {
+            const home = teams[i];
+            const away = teams[n - 1 - i];
+            if (home <= numberOfTeams && away <= numberOfTeams) {
+                allPairings.push({a: home, b: away});
+            }
+        }
+        const last = teams.pop()!;
+        teams.splice(1, 0, last);
+    }
+
+    const teamCourtCounts: Record<number, Record<number, number>> = {};
+    for (let t = 1; t <= numberOfTeams; t++) {
+        teamCourtCounts[t] = {};
+        for (let c = 1; c <= courtCount; c++) {
+            teamCourtCounts[t][c] = 0;
         }
     }
 
     let roundNum = 1;
-    let remainingPairings = [...allPairings];
 
-    while (remainingPairings.length > 0) {
+    while (allPairings.length > 0) {
         const teamsUsedInRound: number[] = [];
-        let courtId = 1;
+        const courtsUsedInRound: number[] = [];
+        let gamesScheduled = 0;
 
-        while (courtId <= courtCount && remainingPairings.length > 0) {
-            const gameIndex = remainingPairings.findIndex(p => 
-                !teamsUsedInRound.includes(p.a) && !teamsUsedInRound.includes(p.b)
-            );
+        while (gamesScheduled < courtCount && allPairings.length > 0) {
+            let bestIdx = -1;
+            let bestCourt = 1;
+            let minUsage = Infinity;
 
-            if (gameIndex === -1) break;
+            for (let i = 0; i < allPairings.length; i++) {
+                const pair = allPairings[i];
+                if (teamsUsedInRound.includes(pair.a) || teamsUsedInRound.includes(pair.b)) continue;
 
-            const game = remainingPairings[gameIndex];
-            remainingPairings.splice(gameIndex, 1);
+                for (let c = 1; c <= courtCount; c++) {
+                    if (courtsUsedInRound.includes(c)) continue;
+                    const usage = teamCourtCounts[pair.a][c] + teamCourtCounts[pair.b][c];
+                    if (usage < minUsage) {
+                        minUsage = usage;
+                        bestIdx = i;
+                        bestCourt = c;
+                    }
+                }
+            }
+
+            if (bestIdx === -1) break;
+
+            const pair = allPairings[bestIdx];
+            allPairings.splice(bestIdx, 1);
+
+            teamCourtCounts[pair.a][bestCourt]++;
+            teamCourtCounts[pair.b][bestCourt]++;
+            teamsUsedInRound.push(pair.a, pair.b);
+            courtsUsedInRound.push(bestCourt);
 
             games.push({
                 id: gameId++,
                 roundNumber: roundNum,
-                courtId: courtId,
+                courtId: bestCourt,
                 stage: 'league',
-                teamAId: game.a,
-                teamBId: game.b,
+                teamAId: pair.a,
+                teamBId: pair.b,
                 scoreA: 0,
                 scoreB: 0,
                 status: 'scheduled',
                 description: 'League Match'
             });
 
-            teamsUsedInRound.push(game.a, game.b);
-            courtId++;
+            gamesScheduled++;
         }
 
         roundNum++;
@@ -174,49 +213,38 @@ export function generateGroupStageSchedule(courtCount: number = 2): Game[] {
         {a: 6, b: 8}, {a: 5, b: 8}, {a: 6, b: 7}
     ];
 
-    let roundNum = 1;
-    let aIdx = 0, bIdx = 0;
+    const interleavedPairings: {pair: {a: number, b: number}, group: 'A' | 'B'}[] = [];
+    const maxLen = Math.max(groupAPairings.length, groupBPairings.length);
+    for (let i = 0; i < maxLen; i++) {
+        if (i < groupAPairings.length) {
+            interleavedPairings.push({pair: groupAPairings[i], group: 'A'});
+        }
+        if (i < groupBPairings.length) {
+            interleavedPairings.push({pair: groupBPairings[i], group: 'B'});
+        }
+    }
 
-    while (aIdx < groupAPairings.length || bIdx < groupBPairings.length) {
+    let roundNum = 1;
+    let idx = 0;
+
+    while (idx < interleavedPairings.length) {
         const teamsUsedInRound: number[] = [];
         let courtId = 1;
 
-        while (courtId <= courtCount) {
-            let scheduled = false;
-
-            if (aIdx < groupAPairings.length) {
-                const pair = groupAPairings[aIdx];
-                if (!teamsUsedInRound.includes(pair.a) && !teamsUsedInRound.includes(pair.b)) {
-                    games.push({
-                        id: gameId++, roundNumber: roundNum, courtId, stage: 'group', group: 'A',
-                        teamAId: pair.a, teamBId: pair.b, scoreA: 0, scoreB: 0, 
-                        status: 'scheduled', description: 'Group A Match'
-                    });
-                    teamsUsedInRound.push(pair.a, pair.b);
-                    aIdx++;
-                    courtId++;
-                    scheduled = true;
-                    continue;
-                }
+        while (courtId <= courtCount && idx < interleavedPairings.length) {
+            const {pair, group} = interleavedPairings[idx];
+            if (!teamsUsedInRound.includes(pair.a) && !teamsUsedInRound.includes(pair.b)) {
+                games.push({
+                    id: gameId++, roundNumber: roundNum, courtId, stage: 'group', group,
+                    teamAId: pair.a, teamBId: pair.b, scoreA: 0, scoreB: 0, 
+                    status: 'scheduled', description: `Group ${group} Match`
+                });
+                teamsUsedInRound.push(pair.a, pair.b);
+                idx++;
+                courtId++;
+            } else {
+                break;
             }
-
-            if (bIdx < groupBPairings.length) {
-                const pair = groupBPairings[bIdx];
-                if (!teamsUsedInRound.includes(pair.a) && !teamsUsedInRound.includes(pair.b)) {
-                    games.push({
-                        id: gameId++, roundNumber: roundNum, courtId, stage: 'group', group: 'B',
-                        teamAId: pair.a, teamBId: pair.b, scoreA: 0, scoreB: 0, 
-                        status: 'scheduled', description: 'Group B Match'
-                    });
-                    teamsUsedInRound.push(pair.a, pair.b);
-                    bIdx++;
-                    courtId++;
-                    scheduled = true;
-                    continue;
-                }
-            }
-
-            if (!scheduled) break;
         }
         roundNum++;
     }

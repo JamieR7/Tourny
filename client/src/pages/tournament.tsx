@@ -67,6 +67,8 @@ export default function TournamentPage() {
   const [showShortGameWarning, setShowShortGameWarning] = useState(false);
   const [pendingGameDuration, setPendingGameDuration] = useState(0);
   const [pendingStartTime, setPendingStartTime] = useState(0);
+  const [showCoachModal, setShowCoachModal] = useState(false);
+  const [finalScoreHold, setFinalScoreHold] = useState(false);
 
   const [finalResultsRevealed, setFinalResultsRevealed] = useState(false);
   const resultsRef = useRef<HTMLDivElement>(null);
@@ -142,17 +144,17 @@ export default function TournamentPage() {
           playBuzzer();
           setTimerActive(false);
           setTimerFinished(true);
+          setFinalScoreHold(true);
           endTimeRef.current = null;
           if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
           
-          // Auto-advance logic
-          if (autoAdvanceRef.current) {
-             // Use setTimeout to allow the state updates from timer stopping to settle/process
-             // and to avoid direct state loop.
-             setTimeout(() => {
-                 executeNextRound(true); // Pass true to indicate auto-advance
-             }, 1000);
-          }
+          // Show final score for 5 seconds before auto-advancing
+          setTimeout(() => {
+            setFinalScoreHold(false);
+            if (autoAdvanceRef.current) {
+               executeNextRound(true);
+            }
+          }, 5000);
         } else {
           setTimeLeft(remaining);
           if (remaining <= 10) {
@@ -501,6 +503,11 @@ export default function TournamentPage() {
 
 
   const handleRevealResults = () => {
+    setShowCoachModal(true);
+  };
+
+  const confirmRevealResults = () => {
+    setShowCoachModal(false);
     setShowCelebration(false);
     setFinalResultsRevealed(true);
     setTimeout(() => {
@@ -695,6 +702,40 @@ export default function TournamentPage() {
                           className="bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold"
                       >
                           Start anyway
+                      </Button>
+                  </div>
+              </div>
+          </div>
+      )}
+
+      {/* Coach Confirmation Modal */}
+      {showCoachModal && (
+          <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
+              <div className={`p-8 rounded-2xl shadow-2xl max-w-md w-full mx-4 border-2 ${theme === 'dark' ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-200'}`}>
+                  <div className="flex items-center gap-3 mb-4">
+                      <Users className="h-8 w-8 text-amber-500" />
+                      <h3 className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Are you the coach?</h3>
+                  </div>
+                  <p className={`mb-8 text-lg ${theme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`}>
+                      Only coaches should reveal the final standings.
+                  </p>
+                  <div className="flex gap-4 justify-end">
+                      <Button 
+                          variant="outline" 
+                          size="lg"
+                          onClick={() => setShowCoachModal(false)}
+                          className={`font-bold ${theme === 'dark' ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-slate-300 text-slate-700 hover:bg-slate-100'}`}
+                          data-testid="button-coach-no"
+                      >
+                          No
+                      </Button>
+                      <Button 
+                          size="lg"
+                          onClick={confirmRevealResults}
+                          className="bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold"
+                          data-testid="button-coach-yes"
+                      >
+                          Yes
                       </Button>
                   </div>
               </div>
@@ -955,7 +996,16 @@ export default function TournamentPage() {
                           </div>
                       )}
                     </CardHeader>
-                    <CardContent className={`p-4 border border-t-0 rounded-b-xl ${theme === 'dark' ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+                    <CardContent className={`p-4 border border-t-0 rounded-b-xl relative ${theme === 'dark' ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+                      {finalScoreHold && game && (
+                        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-green-600/95 rounded-b-xl animate-pulse">
+                          <div className="text-white text-lg font-bold uppercase tracking-widest mb-2">Final Score</div>
+                          <div className="text-white text-6xl font-extrabold font-mono" style={{ fontFamily: 'Montserrat, sans-serif' }}>
+                            {game.scoreA} - {game.scoreB}
+                          </div>
+                          <div className="text-white/80 text-sm mt-3 uppercase tracking-wide">Confirming result...</div>
+                        </div>
+                      )}
                       {game ? (
                         <div className="flex flex-col gap-4">
                           {/* Team A */}
@@ -970,6 +1020,7 @@ export default function TournamentPage() {
                                 size="icon" 
                                 className={`h-9 w-9 border-2 rounded-lg cursor-pointer ${theme === 'dark' ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
                                 onClick={() => updateScore(game.id, 'A', -1)}
+                                disabled={finalScoreHold}
                               >
                                 <Minus className="h-4 w-4" />
                               </Button>
@@ -981,6 +1032,7 @@ export default function TournamentPage() {
                                 size="icon" 
                                 className={`h-9 w-9 border-2 rounded-lg cursor-pointer ${theme === 'dark' ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
                                 onClick={() => updateScore(game.id, 'A', 1)}
+                                disabled={finalScoreHold}
                               >
                                 <Plus className="h-4 w-4" />
                               </Button>
@@ -1001,6 +1053,7 @@ export default function TournamentPage() {
                                 size="icon" 
                                 className={`h-9 w-9 border-2 rounded-lg cursor-pointer ${theme === 'dark' ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
                                 onClick={() => updateScore(game.id, 'B', -1)}
+                                disabled={finalScoreHold}
                               >
                                 <Minus className="h-4 w-4" />
                               </Button>
@@ -1012,6 +1065,7 @@ export default function TournamentPage() {
                                 size="icon" 
                                 className={`h-9 w-9 border-2 rounded-lg cursor-pointer ${theme === 'dark' ? 'border-slate-600 text-slate-300 hover:bg-slate-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
                                 onClick={() => updateScore(game.id, 'B', 1)}
+                                disabled={finalScoreHold}
                               >
                                 <Plus className="h-4 w-4" />
                               </Button>
