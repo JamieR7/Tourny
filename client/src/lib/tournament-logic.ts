@@ -202,6 +202,7 @@ export function generateRoundRobinSchedule(numberOfTeams: number, courtCount: nu
 
 export function generateGroupStageSchedule(courtCount: number = 2): Game[] {
     const games: Game[] = [];
+    let gameId = 1;
 
     const groupAPairings = [
         {a: 1, b: 2}, {a: 3, b: 4}, {a: 1, b: 3}, 
@@ -212,47 +213,48 @@ export function generateGroupStageSchedule(courtCount: number = 2): Game[] {
         {a: 6, b: 8}, {a: 5, b: 8}, {a: 6, b: 7}
     ];
 
-    // Create all fixtures with pre-assigned courts based on fixture order
-    const allFixtures: {pair: {a: number, b: number}, group: 'A' | 'B', courtId: number}[] = [];
+    const interleavedPairings: {pair: {a: number, b: number}, group: 'A' | 'B'}[] = [];
     const maxLen = Math.max(groupAPairings.length, groupBPairings.length);
-    let fixtureIndex = 0;
     for (let i = 0; i < maxLen; i++) {
         if (i < groupAPairings.length) {
-            const courtId = courtCount === 1 ? 1 : (fixtureIndex % 2) + 1;
-            allFixtures.push({pair: groupAPairings[i], group: 'A', courtId});
-            fixtureIndex++;
+            interleavedPairings.push({pair: groupAPairings[i], group: 'A'});
         }
         if (i < groupBPairings.length) {
-            const courtId = courtCount === 1 ? 1 : (fixtureIndex % 2) + 1;
-            allFixtures.push({pair: groupBPairings[i], group: 'B', courtId});
-            fixtureIndex++;
+            interleavedPairings.push({pair: groupBPairings[i], group: 'B'});
         }
     }
 
-    // Schedule fixtures into rounds while preserving pre-assigned courts
     let roundNum = 1;
-    let gameId = 1;
-    const scheduled: boolean[] = new Array(allFixtures.length).fill(false);
-    let scheduledCount = 0;
+    let idx = 0;
+    let globalGameIndex = 0;
 
-    while (scheduledCount < allFixtures.length) {
+    while (idx < interleavedPairings.length) {
         const teamsUsedInRound: number[] = [];
-        let gamesScheduledThisRound = 0;
+        const courtsUsedInRound: number[] = [];
+        let gamesScheduled = 0;
 
-        for (let i = 0; i < allFixtures.length && gamesScheduledThisRound < courtCount; i++) {
-            if (scheduled[i]) continue;
-            
-            const {pair, group, courtId} = allFixtures[i];
+        while (gamesScheduled < courtCount && idx < interleavedPairings.length) {
+            const {pair, group} = interleavedPairings[idx];
             if (!teamsUsedInRound.includes(pair.a) && !teamsUsedInRound.includes(pair.b)) {
+                const courtId = courtCount === 1 ? 1 : (globalGameIndex % 2) + 1;
+                
+                const finalCourtId = courtsUsedInRound.includes(courtId) 
+                    ? (courtId === 1 ? 2 : 1) 
+                    : courtId;
+                
+                courtsUsedInRound.push(finalCourtId);
+                
                 games.push({
-                    id: gameId++, roundNumber: roundNum, courtId, stage: 'group', group,
+                    id: gameId++, roundNumber: roundNum, courtId: finalCourtId, stage: 'group', group,
                     teamAId: pair.a, teamBId: pair.b, scoreA: 0, scoreB: 0, 
                     status: 'scheduled', description: `Group ${group} Match`
                 });
                 teamsUsedInRound.push(pair.a, pair.b);
-                scheduled[i] = true;
-                scheduledCount++;
-                gamesScheduledThisRound++;
+                idx++;
+                gamesScheduled++;
+                globalGameIndex++;
+            } else {
+                break;
             }
         }
         roundNum++;
@@ -338,13 +340,12 @@ export function generateFinalsFixtures(
   lastGameId: number,
   startRound: number = 7,
   courtCount: number = 2,
-  _groupGames: Game[] = []
+  groupGames: Game[] = []
 ): Game[] {
   const games: Game[] = [];
   let nextId = lastGameId + 1;
   let currentRound = startRound;
-  // Group stage always has 12 fixtures for 8-team tournament
-  let gameIndex = 12;
+  let gameIndex = groupGames.length;
 
   if (courtCount >= 2) {
     const sf1Court = (gameIndex % 2) + 1;

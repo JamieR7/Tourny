@@ -1136,9 +1136,8 @@ export default function TournamentPage() {
                      <Table>
                          <TableHeader className={`sticky top-0 z-10 shadow-sm ${theme === 'dark' ? 'bg-slate-800' : 'bg-white'}`}>
                              <TableRow className="border-b-2 border-amber-500">
-                                 <TableHead className={`w-12 font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Rnd</TableHead>
-                                 <TableHead className={`w-12 font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Crt</TableHead>
-                                 <TableHead className={`w-32 font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Match</TableHead>
+                                 <TableHead className={`w-16 font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Rnd</TableHead>
+                                 <TableHead className={`w-40 font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Match</TableHead>
                                  <TableHead className={`text-right font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Team A</TableHead>
                                  <TableHead className={`text-center w-40 font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Score</TableHead>
                                  <TableHead className={`font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Team B</TableHead>
@@ -1147,12 +1146,11 @@ export default function TournamentPage() {
                          <TableBody>
                              {/* Group Stage Header */}
                              <TableRow className={`${theme === 'dark' ? 'bg-slate-900 hover:bg-slate-900' : 'bg-slate-50 hover:bg-slate-50'}`}>
-                                 <TableCell colSpan={6} className="font-bold text-xs uppercase text-slate-500 py-2 text-center tracking-widest">{tournamentFormat === 'groups' ? 'Group Stage' : 'League Games'}</TableCell>
+                                 <TableCell colSpan={5} className="font-bold text-xs uppercase text-slate-500 py-2 text-center tracking-widest">{tournamentFormat === 'groups' ? 'Group Stage' : 'League Games'}</TableCell>
                              </TableRow>
                              {games.filter(g => g.stage === 'group' || g.stage === 'league').map(game => (
                                  <TableRow key={game.id} className={`${game.roundNumber === currentRound ? (theme === 'dark' ? 'bg-slate-700/50' : 'bg-amber-50') : ''} ${theme === 'dark' ? 'hover:bg-slate-700/30' : ''}`}>
                                      <TableCell className="font-mono font-bold text-slate-500">{game.roundNumber}</TableCell>
-                                     <TableCell className="font-mono font-bold text-amber-600">{game.courtId}</TableCell>
                                      <TableCell className="text-xs font-medium text-slate-500">
                                          {game.group ? `Group ${game.group}` : (game.description === 'League Match' ? getCourtName(game.courtId) : game.description)}
                                      </TableCell>
@@ -1208,12 +1206,11 @@ export default function TournamentPage() {
                              {tournamentFormat === 'groups' && (
                                  <>
                                      <TableRow className={`${theme === 'dark' ? 'bg-slate-900 hover:bg-slate-900 border-t-2 border-slate-700' : 'bg-slate-50 hover:bg-slate-50 border-t-2 border-slate-100'}`}>
-                                         <TableCell colSpan={6} className="font-bold text-xs uppercase text-slate-500 py-2 text-center tracking-widest">Finals & Placement</TableCell>
+                                         <TableCell colSpan={5} className="font-bold text-xs uppercase text-slate-500 py-2 text-center tracking-widest">Finals & Placement</TableCell>
                                      </TableRow>
                                      {games.filter(g => g.stage !== 'group').map(game => (
                                          <TableRow key={game.id} className={`${game.roundNumber === currentRound ? (theme === 'dark' ? 'bg-slate-700/50' : 'bg-amber-50') : ''} ${theme === 'dark' ? 'hover:bg-slate-700/30' : ''}`}>
                                              <TableCell className="font-mono font-bold text-slate-500">{game.roundNumber}</TableCell>
-                                             <TableCell className="font-mono font-bold text-amber-600">{game.courtId}</TableCell>
                                              <TableCell className="text-xs font-medium text-slate-500">
                                                   <div className="truncate w-32" title={game.description}>{game.description}</div>
                                              </TableCell>
