@@ -226,22 +226,33 @@ export function generateGroupStageSchedule(courtCount: number = 2): Game[] {
 
     let roundNum = 1;
     let idx = 0;
+    let globalGameIndex = 0;
 
     while (idx < interleavedPairings.length) {
         const teamsUsedInRound: number[] = [];
-        let courtId = 1;
+        const courtsUsedInRound: number[] = [];
+        let gamesScheduled = 0;
 
-        while (courtId <= courtCount && idx < interleavedPairings.length) {
+        while (gamesScheduled < courtCount && idx < interleavedPairings.length) {
             const {pair, group} = interleavedPairings[idx];
             if (!teamsUsedInRound.includes(pair.a) && !teamsUsedInRound.includes(pair.b)) {
+                const courtId = courtCount === 1 ? 1 : (globalGameIndex % 2) + 1;
+                
+                const finalCourtId = courtsUsedInRound.includes(courtId) 
+                    ? (courtId === 1 ? 2 : 1) 
+                    : courtId;
+                
+                courtsUsedInRound.push(finalCourtId);
+                
                 games.push({
-                    id: gameId++, roundNumber: roundNum, courtId, stage: 'group', group,
+                    id: gameId++, roundNumber: roundNum, courtId: finalCourtId, stage: 'group', group,
                     teamAId: pair.a, teamBId: pair.b, scoreA: 0, scoreB: 0, 
                     status: 'scheduled', description: `Group ${group} Match`
                 });
                 teamsUsedInRound.push(pair.a, pair.b);
                 idx++;
-                courtId++;
+                gamesScheduled++;
+                globalGameIndex++;
             } else {
                 break;
             }
@@ -328,48 +339,64 @@ export function generateFinalsFixtures(
   standingsB: Standing[], 
   lastGameId: number,
   startRound: number = 7,
-  courtCount: number = 2
+  courtCount: number = 2,
+  groupGames: Game[] = []
 ): Game[] {
   const games: Game[] = [];
   let nextId = lastGameId + 1;
   let currentRound = startRound;
+  let gameIndex = groupGames.length;
 
   if (courtCount >= 2) {
+    const sf1Court = (gameIndex % 2) + 1;
+    gameIndex++;
+    const sf2Court = (gameIndex % 2) + 1;
+    gameIndex++;
+    
     games.push({
-      id: nextId++, roundNumber: currentRound, courtId: 1, stage: 'semi',
+      id: nextId++, roundNumber: currentRound, courtId: sf1Court, stage: 'semi',
       teamAId: standingsA[0].teamId, teamBId: standingsB[1].teamId,
       scoreA: 0, scoreB: 0, status: 'scheduled',
       description: 'Semi-final 1 (1st A vs 2nd B)', sourceA: '1st Group A', sourceB: '2nd Group B'
     });
     games.push({
-      id: nextId++, roundNumber: currentRound, courtId: 2, stage: 'semi',
+      id: nextId++, roundNumber: currentRound, courtId: sf2Court, stage: 'semi',
       teamAId: standingsB[0].teamId, teamBId: standingsA[1].teamId,
       scoreA: 0, scoreB: 0, status: 'scheduled',
       description: 'Semi-final 2 (1st B vs 2nd A)', sourceA: '1st Group B', sourceB: '2nd Group A'
     });
     currentRound++;
     
+    const p56Court = (gameIndex % 2) + 1;
+    gameIndex++;
+    const p78Court = (gameIndex % 2) + 1;
+    gameIndex++;
+    
     games.push({
-      id: nextId++, roundNumber: currentRound, courtId: 1, stage: 'placing',
+      id: nextId++, roundNumber: currentRound, courtId: p56Court, stage: 'placing',
       teamAId: standingsA[2].teamId, teamBId: standingsB[2].teamId,
       scoreA: 0, scoreB: 0, status: 'scheduled',
       description: '5th/6th Playoff (3rd A vs 3rd B)', sourceA: '3rd Group A', sourceB: '3rd Group B'
     });
     games.push({
-      id: nextId++, roundNumber: currentRound, courtId: 2, stage: 'placing',
+      id: nextId++, roundNumber: currentRound, courtId: p78Court, stage: 'placing',
       teamAId: standingsA[3].teamId, teamBId: standingsB[3].teamId,
       scoreA: 0, scoreB: 0, status: 'scheduled',
       description: '7th/8th Playoff (4th A vs 4th B)', sourceA: '4th Group A', sourceB: '4th Group B'
     });
     currentRound++;
 
+    const finalCourt = (gameIndex % 2) + 1;
+    gameIndex++;
+    const p34Court = (gameIndex % 2) + 1;
+    
     games.push({
-      id: nextId++, roundNumber: currentRound, courtId: 1, stage: 'final',
+      id: nextId++, roundNumber: currentRound, courtId: finalCourt, stage: 'final',
       teamAId: null, teamBId: null, scoreA: 0, scoreB: 0, status: 'scheduled',
       description: 'Grand Final (Winner SF1 vs Winner SF2)', sourceA: 'Winner SF1', sourceB: 'Winner SF2'
     });
     games.push({
-      id: nextId++, roundNumber: currentRound, courtId: 2, stage: 'placing',
+      id: nextId++, roundNumber: currentRound, courtId: p34Court, stage: 'placing',
       teamAId: null, teamBId: null, scoreA: 0, scoreB: 0, status: 'scheduled',
       description: '3rd/4th Playoff (Loser SF1 vs Loser SF2)', sourceA: 'Loser SF1', sourceB: 'Loser SF2'
     });

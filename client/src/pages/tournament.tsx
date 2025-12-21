@@ -32,6 +32,7 @@ import { format, addSeconds } from "date-fns";
 export default function TournamentPage() {
   // Setup State
   const [isSetupMode, setIsSetupMode] = useState(true);
+  const [tournamentTitle, setTournamentTitle] = useState("PE TOURNAMENT");
   const [tournamentFormat, setTournamentFormat] = useState<TournamentFormat>('groups');
   const [teamCount, setTeamCount] = useState<number>(8);
   const [teamNames, setTeamNames] = useState<Record<number, string>>({});
@@ -333,13 +334,14 @@ export default function TournamentPage() {
           const standingsA = calculateStandings(updatedGames, teams.filter(t => t.group === 'A'));
           const standingsB = calculateStandings(updatedGames, teams.filter(t => t.group === 'B'));
           const lastId = Math.max(...updatedGames.map(g => g.id));
-          const newFixtures = generateFinalsFixtures(standingsA, standingsB, lastId, semiRound, courtCount);
+          const groupGames = updatedGames.filter(g => g.stage === 'group');
+          const newFixtures = generateFinalsFixtures(standingsA, standingsB, lastId, semiRound, courtCount, groupGames);
           finalGames = [...updatedGames, ...newFixtures];
         }
 
         if (courtCount >= 2 && r === semiRound) {
-            const sf1 = finalGames.find(g => g.roundNumber === semiRound && g.courtId === 1 && g.stage === 'semi');
-            const sf2 = finalGames.find(g => g.roundNumber === semiRound && g.courtId === 2 && g.stage === 'semi');
+            const sf1 = finalGames.find(g => g.roundNumber === semiRound && g.stage === 'semi' && g.description.includes('Semi-final 1'));
+            const sf2 = finalGames.find(g => g.roundNumber === semiRound && g.stage === 'semi' && g.description.includes('Semi-final 2'));
             const finalsRound = semiRound + 2;
             
             if (sf1 && sf2) {
@@ -756,7 +758,7 @@ export default function TournamentPage() {
         </div>
 
         <h1 className={`text-4xl md:text-5xl font-extrabold uppercase tracking-tight font-display ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-          PE Tournament
+          {tournamentTitle || "PE TOURNAMENT"}
         </h1>
         
         {/* Setup Mode / Format Selector */}
@@ -765,6 +767,17 @@ export default function TournamentPage() {
                  <div className="flex items-center gap-2 mb-6">
                      <Settings className="h-6 w-6 text-amber-500" />
                      <h2 className={`text-2xl font-bold uppercase tracking-wide ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Tournament Setup</h2>
+                 </div>
+
+                 <div className="w-full mb-6">
+                     <Label className={`text-lg font-semibold mb-2 block ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>Tournament Title</Label>
+                     <Input 
+                         value={tournamentTitle}
+                         onChange={(e) => setTournamentTitle(e.target.value)}
+                         className={`h-12 text-lg font-bold text-center ${theme === 'dark' ? 'bg-slate-900 border-slate-700' : 'bg-white'}`}
+                         placeholder="PE TOURNAMENT"
+                         data-testid="input-tournament-title"
+                     />
                  </div>
                  
                  <div className="w-full grid md:grid-cols-2 gap-8">

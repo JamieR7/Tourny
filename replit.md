@@ -41,11 +41,14 @@ Tournament state is managed through TypeScript types defined in `client/src/lib/
 ### Key Features
 
 1. **Variable Configuration**: 4/6/8 teams, 1-4 courts, round-robin or group stage formats
-2. **Conflict-Free Scheduling**: Greedy algorithm ensures no team plays twice in the same round
-3. **Timer System**: Per-round countdown with start/pause/reset controls and optional auto-advance
-4. **Live Scoring**: Score updates from court cards or fixtures table with automatic standings recalculation
-5. **Finals Structure**: For 8-team group stage - semi-finals, placement games (3rd-8th), and final
-6. **Celebration Screen**: Confetti animation overlay before revealing final standings
+2. **Editable Tournament Title**: Custom title field on setup (default "PE TOURNAMENT") displayed throughout
+3. **Court Rotation (8-team)**: Games alternate between courts (1, 2, 1, 2...) for balanced play
+4. **Conflict-Free Scheduling**: Berger-table rotation for round-robin, interleaved groups for group stage
+5. **Timer System**: Per-round countdown with start/pause/reset, 5-second final score display, optional auto-advance
+6. **Coach Confirmation**: Modal confirmation before revealing final standings
+7. **Live Scoring**: Score updates from court cards or fixtures table with automatic standings recalculation
+8. **Finals Structure**: For 8-team group stage - semi-finals, placement games (3rd-8th), and final
+9. **Celebration Screen**: Confetti animation overlay before revealing final standings
 
 ## External Dependencies
 
