@@ -133,38 +133,19 @@ export function generateRoundRobinSchedule(numberOfTeams: number, courtCount: nu
         teams.splice(1, 0, last);
     }
 
-    const teamCourtCounts: Record<number, Record<number, number>> = {};
-    for (let t = 1; t <= numberOfTeams; t++) {
-        teamCourtCounts[t] = {};
-        for (let c = 1; c <= courtCount; c++) {
-            teamCourtCounts[t][c] = 0;
-        }
-    }
-
     let roundNum = 1;
 
     while (allPairings.length > 0) {
         const teamsUsedInRound: number[] = [];
-        const courtsUsedInRound: number[] = [];
-        let gamesScheduled = 0;
+        const gamesInThisRound: {a: number, b: number}[] = [];
 
-        while (gamesScheduled < courtCount && allPairings.length > 0) {
+        while (gamesInThisRound.length < courtCount && allPairings.length > 0) {
             let bestIdx = -1;
-            let bestCourt = 1;
-            let minUsage = Infinity;
-
             for (let i = 0; i < allPairings.length; i++) {
                 const pair = allPairings[i];
-                if (teamsUsedInRound.includes(pair.a) || teamsUsedInRound.includes(pair.b)) continue;
-
-                for (let c = 1; c <= courtCount; c++) {
-                    if (courtsUsedInRound.includes(c)) continue;
-                    const usage = teamCourtCounts[pair.a][c] + teamCourtCounts[pair.b][c];
-                    if (usage < minUsage) {
-                        minUsage = usage;
-                        bestIdx = i;
-                        bestCourt = c;
-                    }
+                if (!teamsUsedInRound.includes(pair.a) && !teamsUsedInRound.includes(pair.b)) {
+                    bestIdx = i;
+                    break;
                 }
             }
 
@@ -172,16 +153,17 @@ export function generateRoundRobinSchedule(numberOfTeams: number, courtCount: nu
 
             const pair = allPairings[bestIdx];
             allPairings.splice(bestIdx, 1);
-
-            teamCourtCounts[pair.a][bestCourt]++;
-            teamCourtCounts[pair.b][bestCourt]++;
+            gamesInThisRound.push(pair);
             teamsUsedInRound.push(pair.a, pair.b);
-            courtsUsedInRound.push(bestCourt);
+        }
 
+        const courtOffset = (roundNum - 1) % courtCount;
+        gamesInThisRound.forEach((pair, gameIndex) => {
+            const courtId = courtCount === 1 ? 1 : ((gameIndex + courtOffset) % courtCount) + 1;
             games.push({
                 id: gameId++,
                 roundNumber: roundNum,
-                courtId: bestCourt,
+                courtId,
                 stage: 'league',
                 teamAId: pair.a,
                 teamBId: pair.b,
@@ -190,9 +172,7 @@ export function generateRoundRobinSchedule(numberOfTeams: number, courtCount: nu
                 status: 'scheduled',
                 description: 'League Match'
             });
-
-            gamesScheduled++;
-        }
+        });
 
         roundNum++;
     }
@@ -226,37 +206,32 @@ export function generateGroupStageSchedule(courtCount: number = 2): Game[] {
 
     let roundNum = 1;
     let idx = 0;
-    let globalGameIndex = 0;
 
     while (idx < interleavedPairings.length) {
         const teamsUsedInRound: number[] = [];
-        const courtsUsedInRound: number[] = [];
-        let gamesScheduled = 0;
+        const gamesInThisRound: {pair: {a: number, b: number}, group: 'A' | 'B'}[] = [];
 
-        while (gamesScheduled < courtCount && idx < interleavedPairings.length) {
+        while (gamesInThisRound.length < courtCount && idx < interleavedPairings.length) {
             const {pair, group} = interleavedPairings[idx];
             if (!teamsUsedInRound.includes(pair.a) && !teamsUsedInRound.includes(pair.b)) {
-                const courtId = courtCount === 1 ? 1 : (globalGameIndex % 2) + 1;
-                
-                const finalCourtId = courtsUsedInRound.includes(courtId) 
-                    ? (courtId === 1 ? 2 : 1) 
-                    : courtId;
-                
-                courtsUsedInRound.push(finalCourtId);
-                
-                games.push({
-                    id: gameId++, roundNumber: roundNum, courtId: finalCourtId, stage: 'group', group,
-                    teamAId: pair.a, teamBId: pair.b, scoreA: 0, scoreB: 0, 
-                    status: 'scheduled', description: `Group ${group} Match`
-                });
+                gamesInThisRound.push({pair, group});
                 teamsUsedInRound.push(pair.a, pair.b);
                 idx++;
-                gamesScheduled++;
-                globalGameIndex++;
             } else {
                 break;
             }
         }
+
+        const courtOffset = (roundNum - 1) % courtCount;
+        gamesInThisRound.forEach((item, gameIndex) => {
+            const courtId = courtCount === 1 ? 1 : ((gameIndex + courtOffset) % courtCount) + 1;
+            games.push({
+                id: gameId++, roundNumber: roundNum, courtId, stage: 'group', group: item.group,
+                teamAId: item.pair.a, teamBId: item.pair.b, scoreA: 0, scoreB: 0, 
+                status: 'scheduled', description: `Group ${item.group} Match`
+            });
+        });
+
         roundNum++;
     }
 
@@ -345,13 +320,11 @@ export function generateFinalsFixtures(
   const games: Game[] = [];
   let nextId = lastGameId + 1;
   let currentRound = startRound;
-  let gameIndex = groupGames.length;
 
   if (courtCount >= 2) {
-    const sf1Court = (gameIndex % 2) + 1;
-    gameIndex++;
-    const sf2Court = (gameIndex % 2) + 1;
-    gameIndex++;
+    const semiOffset = (currentRound - 1) % courtCount;
+    const sf1Court = ((0 + semiOffset) % courtCount) + 1;
+    const sf2Court = ((1 + semiOffset) % courtCount) + 1;
     
     games.push({
       id: nextId++, roundNumber: currentRound, courtId: sf1Court, stage: 'semi',
@@ -367,10 +340,9 @@ export function generateFinalsFixtures(
     });
     currentRound++;
     
-    const p56Court = (gameIndex % 2) + 1;
-    gameIndex++;
-    const p78Court = (gameIndex % 2) + 1;
-    gameIndex++;
+    const placingOffset = (currentRound - 1) % courtCount;
+    const p56Court = ((0 + placingOffset) % courtCount) + 1;
+    const p78Court = ((1 + placingOffset) % courtCount) + 1;
     
     games.push({
       id: nextId++, roundNumber: currentRound, courtId: p56Court, stage: 'placing',
@@ -386,9 +358,9 @@ export function generateFinalsFixtures(
     });
     currentRound++;
 
-    const finalCourt = (gameIndex % 2) + 1;
-    gameIndex++;
-    const p34Court = (gameIndex % 2) + 1;
+    const finalOffset = (currentRound - 1) % courtCount;
+    const finalCourt = ((0 + finalOffset) % courtCount) + 1;
+    const p34Court = ((1 + finalOffset) % courtCount) + 1;
     
     games.push({
       id: nextId++, roundNumber: currentRound, courtId: finalCourt, stage: 'final',
